@@ -7,93 +7,129 @@
     :root {
       --bg: #050505;
       --card-bg: #111111;
-      --card-hover: #1A1A1A;
       --text: #FFFFFF;
       --text-muted: #666666;
-      --primary: #3B82F6; /* Electric Blue */
-      --primary-glow: rgba(59, 130, 246, 0.4);
-      --accent: #10B981; /* Neon Green */
+      --primary: #3B82F6;
+      --accent: #10B981;
       --border: #222222;
       --radius: 12px;
-      --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+      --transition: all 0.25s ease;
     }
     
     body { 
-      font-family: 'Zalando Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
-      padding: 20px; 
+      font-family: 'Inter', sans-serif; 
+      padding: 0; 
       color: var(--text); 
       margin: 0; 
       background: var(--bg);
       -webkit-font-smoothing: antialiased;
-      overflow: hidden; /* Prevent scrollbars */
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
     }
 
-    /* Typography */
-    h2 { 
-      font-size: 13px; 
-      font-weight: 500; 
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin: 0 0 20px 0;
+    /* Tabs */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    
+    .tab {
+      flex: 1;
+      padding: 16px;
       text-align: center;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      position: relative;
+      transition: var(--transition);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    .tab:hover { color: #888; }
+    
+    .tab.active {
+      color: var(--text);
+      font-weight: 600;
+    }
+    
+    .tab.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: var(--primary);
+      box-shadow: 0 -2px 10px rgba(59, 130, 246, 0.5);
     }
 
+    /* Content Area */
+    .content {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+    
+    .content.active { display: block; }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Components */
     h3 {
       font-size: 11px;
       font-weight: 600;
       color: var(--text-muted);
-      margin: 24px 0 12px 4px;
+      margin: 8px 0 16px 4px;
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
 
-    /* Code Box - Hero Element */
+    /* Code Box */
     .code-container {
-      position: relative;
       background: var(--card-bg);
       border-radius: 16px;
-      padding: 24px;
+      padding: 32px 20px;
       text-align: center;
       cursor: pointer;
       border: 1px solid var(--border);
       transition: var(--transition);
-      margin-bottom: 24px;
+      margin: 20px 0;
+      position: relative;
       overflow: hidden;
     }
     
-    .code-container::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-    }
-
     .code-container:hover {
       border-color: #333;
       transform: translateY(-2px);
       box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
     }
     
-    .code-container:active {
-      transform: scale(0.98);
-    }
-    
     .code-val {
       font-family: 'Inter', monospace;
-      font-size: 36px;
+      font-size: 42px;
       font-weight: 600;
       color: var(--text);
-      letter-spacing: 4px;
-      text-shadow: 0 0 20px rgba(255,255,255,0.1);
+      letter-spacing: 6px;
+      text-shadow: 0 0 30px rgba(255,255,255,0.1);
     }
     
     .code-label {
       font-size: 10px;
       color: var(--text-muted);
-      margin-top: 12px;
+      margin-top: 16px;
       font-weight: 500;
-      opacity: 0.7;
+      letter-spacing: 1px;
+      text-transform: uppercase;
     }
 
     /* Connection Status */
@@ -101,32 +137,29 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 6px 12px;
+      padding: 8px 16px;
       background: var(--card-bg);
       border: 1px solid var(--border);
       border-radius: 100px;
-      font-size: 11px;
+      font-size: 12px;
       color: var(--text-muted);
-      margin-top: -12px; /* Pull up closer to code box */
-      margin-bottom: 20px;
-      position: relative;
-      z-index: 2;
+      margin: 0 auto;
     }
     
     .dot { 
-      width: 6px; 
-      height: 6px; 
+      width: 8px; 
+      height: 8px; 
       border-radius: 50%; 
-      background: #444; 
+      background: #333; 
       transition: var(--transition);
     }
     
     .dot.connected { 
       background: var(--accent); 
-      box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
     }
 
-    /* Controls Container */
+    /* Controls */
     .card {
       background: var(--card-bg);
       border: 1px solid var(--border);
@@ -139,211 +172,153 @@
       display: flex; 
       align-items: center; 
       justify-content: space-between; 
-      margin-bottom: 16px; 
-      height: 28px;
+      margin-bottom: 20px; 
     }
     .control-row:last-child { margin-bottom: 0; }
     
-    .label { 
-      font-size: 13px; 
-      color: #CCC; 
-      flex: 1; 
-    }
-    
+    .label { font-size: 13px; color: #CCC; flex: 1; }
     .value { 
-      font-size: 13px; 
-      font-weight: 500; 
-      color: var(--text-muted); 
-      min-width: 32px; 
-      text-align: right; 
-      font-variant-numeric: tabular-nums;
+      font-size: 13px; font-weight: 500; color: var(--text-muted); 
+      min-width: 32px; text-align: right; 
     }
 
-    /* Futuristic Range Slider */
+    /* Inputs */
     input[type="range"] {
-      flex: 1;
-      margin: 0 16px;
-      -webkit-appearance: none;
-      height: 2px;
-      background: #333;
-      border-radius: 2px;
-      outline: none;
+      flex: 1; margin: 0 16px; -webkit-appearance: none; height: 2px;
+      background: #333; border-radius: 2px; outline: none;
     }
-    
     input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: var(--text);
-      border: 2px solid var(--bg);
-      cursor: pointer;
-      box-shadow: 0 0 10px rgba(255,255,255,0.2);
-      transition: var(--transition);
+      -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+      background: var(--text); border: 2px solid var(--bg); cursor: pointer;
+      box-shadow: 0 0 10px rgba(255,255,255,0.2); transition: var(--transition);
     }
-    
-    input[type="range"]::-webkit-slider-thumb:hover {
-      transform: scale(1.2);
-      box-shadow: 0 0 15px rgba(255,255,255,0.4);
-    }
+    input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
 
-    /* Minimal Switch */
-    .switch {
-      position: relative;
-      display: inline-block;
-      width: 36px;
-      height: 20px;
-    }
+    /* Switch */
+    .switch { position: relative; display: inline-block; width: 36px; height: 20px; }
     .switch input { opacity: 0; width: 0; height: 0; }
     .slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-color: #333;
-      transition: .3s;
-      border-radius: 20px;
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #333; transition: .3s; border-radius: 20px;
     }
     .slider:before {
-      position: absolute;
-      content: "";
-      height: 16px;
-      width: 16px;
-      left: 2px;
-      bottom: 2px;
-      background-color: #888;
-      transition: .3s;
-      border-radius: 50%;
+      position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px;
+      background-color: #888; transition: .3s; border-radius: 50%;
     }
     input:checked + .slider { background-color: var(--primary); }
-    input:checked + .slider:before { 
-      transform: translateX(16px); 
-      background-color: white;
-    }
+    input:checked + .slider:before { transform: translateX(16px); background-color: white; }
 
-    /* Color Input */
     input[type="color"] {
-      -webkit-appearance: none;
-      border: 1px solid #333;
-      width: 24px;
-      height: 24px;
-      border-radius: 6px;
-      padding: 0;
-      overflow: hidden;
-      cursor: pointer;
-      background: none;
+      -webkit-appearance: none; border: 1px solid #333; width: 24px; height: 24px;
+      border-radius: 6px; padding: 0; cursor: pointer; background: none;
     }
-    input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
-    input[type="color"]::-webkit-color-swatch { border: none; }
 
-    /* Action Button */
+    /* Button */
     .btn-primary {
-      width: 100%;
-      background: var(--text);
-      color: var(--bg);
-      border: none;
-      padding: 14px;
-      border-radius: var(--radius);
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: var(--transition);
-      margin-top: 24px;
-      position: relative;
-      overflow: hidden;
+      width: 100%; background: var(--text); color: var(--bg); border: none;
+      padding: 14px; border-radius: var(--radius); font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: var(--transition); margin-top: 24px;
     }
-    
     .btn-primary:hover {
-      background: #E0E0E0;
-      transform: translateY(-1px);
+      background: #E0E0E0; transform: translateY(-1px);
       box-shadow: 0 0 20px rgba(255,255,255,0.15);
     }
     
-    .btn-primary:active {
-      transform: scale(0.98);
-    }
-
-    /* Settings Panel Animation */
     #borderSettings {
-      padding-top: 16px;
-      margin-top: 16px;
-      border-top: 1px solid var(--border);
-      display: none;
-      animation: slideDown 0.3s ease;
+      padding-top: 20px; margin-top: 20px; border-top: 1px solid var(--border);
+      display: none; animation: slideDown 0.3s ease;
     }
-
-    @keyframes slideDown {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
     
-    /* Centering Wrapper */
-    .center-col {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+    .center-col { display: flex; flex-direction: column; align-items: center; }
+    
+    /* Guide Text */
+    .guide-text {
+      text-align: center;
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-top: 32px;
+      max-width: 240px;
     }
-
   </style>
 </head>
 <body>
 
-  <!-- Header -->
-  <h2>Pinterest Bridge</h2>
-
-  <!-- Pairing Section -->
-  <div class="code-container" id="codeDisplay">
-    <div class="code-val" id="codeText">...</div>
-    <div class="code-label">CLICK TO COPY</div>
-  </div>
-  
-  <div class="center-col">
-    <div class="status-badge">
-      <span class="dot" id="statusDot"></span>
-      <span id="statusText" style="margin-left: 6px">Connecting...</span>
-    </div>
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('connect')">Connect</div>
+    <div class="tab" onclick="switchTab('grid')">Grid & Session</div>
   </div>
 
-  <!-- Config Section -->
-  <h3>Grid System</h3>
-  <div class="card">
-    <div class="control-row">
-      <span class="label">Columns</span>
-      <input type="range" id="colsRange" min="1" max="6" value="3">
-      <span class="value" id="colsVal">3</span>
-    </div>
-
-    <div class="control-row">
-      <span class="label">Gap</span>
-      <input type="range" id="gapRange" min="0" max="100" value="20">
-      <span class="value" id="gapVal">20</span>
-    </div>
-
-    <div class="control-row">
-      <span class="label">Show Border</span>
-      <label class="switch">
-        <input type="checkbox" id="borderToggle">
-        <span class="slider"></span>
-      </label>
-    </div>
-
-    <div id="borderSettings">
-      <div class="control-row">
-        <span class="label">Thickness</span>
-        <input type="range" id="borderWRange" min="1" max="20" value="2">
-        <span class="value" id="borderWVal">2</span>
+  <!-- Tab 1: Connect -->
+  <div id="tab-connect" class="content active">
+    <div class="center-col" style="height: 100%; justify-content: center;">
+      
+      <div class="code-container" id="codeDisplay">
+        <div class="code-val" id="codeText">...</div>
+        <div class="code-label">Click to Copy Code</div>
       </div>
-      <div class="control-row">
-        <span class="label">Color</span>
-        <input type="color" id="borderColor" value="#FFFFFF">
+      
+      <div class="status-badge">
+        <span class="dot" id="statusDot"></span>
+        <span id="statusText" style="margin-left: 8px">Connecting...</span>
       </div>
+
+      <p class="guide-text">
+        1. Install Chrome Extension<br>
+        2. Enter this code in the extension<br>
+        3. Click "Send to Figma" on Pinterest
+      </p>
+
     </div>
   </div>
 
-  <button class="btn-primary" id="newSessionBtn">Start New Session</button>
-  
-  <!-- Status Text Footer -->
-  <div class="center-col" style="margin-top: 16px;">
-    <span id="sessionStatus" style="font-size: 11px; color: var(--text-muted);">No Active Session</span>
+  <!-- Tab 2: Grid & Session -->
+  <div id="tab-grid" class="content">
+    
+    <h3>Active Session</h3>
+    <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+      <span class="label">Status</span>
+      <span id="sessionStatus" style="font-size:12px; font-weight:500; color:var(--text-muted);">None</span>
+    </div>
+
+    <h3>Grid Configuration</h3>
+    <div class="card">
+      <div class="control-row">
+        <span class="label">Columns</span>
+        <input type="range" id="colsRange" min="1" max="6" value="3">
+        <span class="value" id="colsVal">3</span>
+      </div>
+
+      <div class="control-row">
+        <span class="label">Gap</span>
+        <input type="range" id="gapRange" min="0" max="100" value="20">
+        <span class="value" id="gapVal">20</span>
+      </div>
+
+      <div class="control-row">
+        <span class="label">Show Border</span>
+        <label class="switch">
+          <input type="checkbox" id="borderToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div id="borderSettings">
+        <div class="control-row">
+          <span class="label">Thickness</span>
+          <input type="range" id="borderWRange" min="1" max="20" value="2">
+          <span class="value" id="borderWVal">2</span>
+        </div>
+        <div class="control-row">
+          <span class="label">Color</span>
+          <input type="color" id="borderColor" value="#FFFFFF">
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="newSessionBtn">Start New Session</button>
   </div>
 
   <script>
@@ -351,6 +326,19 @@
     var ROOM_ID = Math.floor(100000 + Math.random() * 900000).toString();
     var ws = null;
     var reconnectTimer = null;
+
+    // Tabs Logic
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+      
+      // Highlight tab
+      const tabIndex = tabId === 'connect' ? 0 : 1;
+      document.querySelectorAll('.tab')[tabIndex].classList.add('active');
+      
+      // Show content
+      document.getElementById('tab-' + tabId).classList.add('active');
+    }
 
     // UI Elements
     var codeDisplay = document.getElementById('codeDisplay');
@@ -372,7 +360,7 @@
 
     codeText.textContent = ROOM_ID;
 
-    // Copy code interaction
+    // Copy code
     codeDisplay.onclick = function() {
       var ta = document.createElement('textarea');
       ta.value = ROOM_ID;
@@ -434,7 +422,7 @@
 
       if (msg.type === 'session-status') {
         var isActive = msg.status === 'Active' || msg.status === 'Resumed';
-        sessionStatus.textContent = isActive ? 'Session Active' : 'No Active Session';
+        sessionStatus.textContent = isActive ? 'Active' : 'None';
         sessionStatus.style.color = isActive ? 'var(--accent)' : 'var(--text-muted)';
       }
     };
