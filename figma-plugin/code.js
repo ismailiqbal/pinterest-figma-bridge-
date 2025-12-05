@@ -50,7 +50,7 @@ function findEmptyArea() {
   
   allNodes.forEach(node => {
     // Skip if it's one of our grid images (optional: check by name or metadata)
-    if (node.type === 'RECTANGLE' && node.fills && node.fills[0]?.type === 'IMAGE') {
+    if (node.type === 'RECTANGLE' && node.fills && node.fills[0] && node.fills[0].type === 'IMAGE') {
       // This might be one of our images, but we'll include it in bounds calculation
     }
     
