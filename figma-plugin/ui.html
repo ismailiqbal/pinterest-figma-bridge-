@@ -2,161 +2,325 @@
 <html>
 <head>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
     :root {
-      --primary: #000000;
-      --accent: #00C853;
       --bg: #FFFFFF;
-      --bg-secondary: #F5F5F5;
+      --bg-hover: #F5F5F5;
       --text: #333333;
       --text-muted: #888888;
-      --border: #E5E5E5;
+      --border: #E6E6E6;
+      --primary: #18A0FB; /* Figma Blue */
+      --primary-hover: #0D8CE0;
+      --success: #1BC47D;
+      --error: #F24822;
       --radius: 8px;
+      --radius-lg: 12px;
     }
     
     body { 
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
-      padding: 16px; 
+      font-family: 'Inter', sans-serif; 
+      padding: 20px; 
       color: var(--text); 
       margin: 0; 
       background: var(--bg);
+      -webkit-font-smoothing: antialiased;
     }
 
-    h2 { font-size: 16px; font-weight: 600; margin: 0 0 12px 0; }
-    h3 { font-size: 12px; font-weight: 600; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.5px; }
-    p { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
-
-    .section { margin-bottom: 24px; }
+    /* Typography */
+    h2 { 
+      font-size: 14px; 
+      font-weight: 600; 
+      margin: 0 0 16px 0; 
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
     
-    .code-box {
-      background: var(--bg-secondary);
+    h3 { 
+      font-size: 11px; 
+      font-weight: 600; 
+      text-transform: uppercase; 
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      margin: 24px 0 12px 0;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg);
       border: 1px solid var(--border);
-      border-radius: var(--radius);
+      border-radius: var(--radius-lg);
       padding: 16px;
-      font-family: 'Courier New', monospace;
-      font-size: 20px;
-      letter-spacing: 2px;
-      font-weight: 700;
+      margin-bottom: 16px;
+      transition: border-color 0.2s;
+    }
+    
+    /* Code Display */
+    .code-container {
+      position: relative;
+      background: var(--bg-hover);
+      border-radius: var(--radius);
+      padding: 20px;
       text-align: center;
       cursor: pointer;
+      border: 1px solid transparent;
       transition: all 0.2s;
     }
-    .code-box:active { transform: scale(0.98); }
-
-    .status-badge {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      font-size: 11px;
+    .code-container:hover {
+      border-color: var(--border);
+      background: #F0F0F0;
+    }
+    .code-container:active {
+      transform: scale(0.99);
+    }
+    
+    .code-val {
+      font-family: 'SF Mono', 'Roboto Mono', monospace;
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: 2px;
+    }
+    
+    .code-label {
+      font-size: 10px;
       color: var(--text-muted);
       margin-top: 8px;
+      font-weight: 500;
     }
-    .dot { width: 6px; height: 6px; border-radius: 50%; background: #ccc; }
-    .dot.connected { background: var(--accent); box-shadow: 0 0 4px var(--accent); }
 
-    .control-group { 
+    /* Status Dot */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      background: #F5F5F5;
+      border-radius: 100px;
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-top: 12px;
+    }
+    .dot { 
+      width: 6px; 
+      height: 6px; 
+      border-radius: 50%; 
+      background: #ccc; 
+      transition: background 0.3s;
+    }
+    .dot.connected { 
+      background: var(--success); 
+      box-shadow: 0 0 0 2px rgba(27, 196, 125, 0.2);
+    }
+
+    /* Controls */
+    .control-row { 
       display: flex; 
       align-items: center; 
       justify-content: space-between; 
-      margin-bottom: 12px; 
+      margin-bottom: 16px; 
+      gap: 12px;
     }
-    .label { font-size: 11px; color: var(--text-muted); flex: 1; }
-    .value { font-size: 11px; font-weight: 600; min-width: 24px; text-align: right; }
+    .control-row:last-child { margin-bottom: 0; }
     
-    input[type="range"] { flex: 1; margin: 0 12px; }
-    input[type="color"] {
-      width: 40px; height: 24px; 
-      border: 1px solid var(--border); 
-      border-radius: 4px; 
-      cursor: pointer; 
-      padding: 0;
+    .label { font-size: 12px; font-weight: 500; color: var(--text); flex: 1; }
+    .value { 
+      font-size: 12px; 
+      font-weight: 600; 
+      color: var(--text-muted); 
+      min-width: 24px; 
+      text-align: right; 
+      font-variant-numeric: tabular-nums;
     }
 
-    .btn {
-      width: 100%;
-      padding: 10px;
-      border: 1px solid var(--border);
-      background: var(--bg-secondary);
-      border-radius: var(--radius);
-      font-size: 11px;
-      font-weight: 500;
+    /* Custom Inputs */
+    input[type="range"] {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: white;
+      border: 2px solid var(--border);
       cursor: pointer;
-      transition: background 0.2s;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      transition: all 0.2s;
     }
-    .btn:hover { background: #EBEBEB; }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      border-color: var(--primary);
+      transform: scale(1.1);
+    }
 
+    /* Switch */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 32px;
+      height: 20px;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: var(--border);
+      transition: .3s;
+      border-radius: 20px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    input:checked + .slider { background-color: var(--primary); }
+    input:checked + .slider:before { transform: translateX(12px); }
+
+    /* Color Input */
+    input[type="color"] {
+      -webkit-appearance: none;
+      border: 1px solid var(--border);
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      padding: 0;
+      overflow: hidden;
+      cursor: pointer;
+    }
+    input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+    input[type="color"]::-webkit-color-swatch { border: none; }
+
+    /* Primary Button */
+    .btn-primary {
+      width: 100%;
+      background: var(--text);
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: var(--radius);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 24px;
+    }
+    .btn-primary:hover {
+      background: black;
+      transform: translateY(-1px);
+    }
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    /* Session Status */
+    .session-info {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #F8F9FA;
+      border-radius: var(--radius);
+      border: 1px dashed var(--border);
+      margin-top: 16px;
+    }
+    .status-dot {
+      width: 8px; 
+      height: 8px; 
+      border-radius: 50%; 
+      display: inline-block;
+      margin-right: 6px;
+    }
+    
     #borderSettings {
-      padding-top: 12px;
-      margin-top: 12px;
+      margin-top: 16px;
+      padding-top: 16px;
       border-top: 1px solid var(--border);
       display: none;
     }
-    
-    .session-card {
-      background: #F8F9FA;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 12px;
-      margin-bottom: 12px;
+
+    /* Animations */
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.5; }
+      100% { transform: scale(1.05); opacity: 0.8; }
     }
-    .session-status { font-weight: 600; font-size: 11px; }
-    .status-active { color: var(--accent); }
-    .status-none { color: var(--text-muted); }
+    .receiving { animation: pulse 0.5s infinite alternate; }
   </style>
 </head>
 <body>
 
-  <div class="section">
-    <h2>Pinterest Bridge</h2>
-    <div class="code-box" id="codeDisplay">...</div>
+  <!-- Pairing Section -->
+  <div style="text-align: center; margin-bottom: 24px;">
+    <div class="code-container" id="codeDisplay">
+      <div class="code-val" id="codeText">...</div>
+      <div class="code-label">CLICK TO COPY CODE</div>
+    </div>
+    
     <div class="status-badge">
       <span class="dot" id="statusDot"></span>
       <span id="statusText">Connecting...</span>
     </div>
   </div>
 
-  <div class="session-card">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <span class="label">Session Status</span>
-      <span id="sessionStatus" class="session-status status-none">None ⚪</span>
-    </div>
-    <p style="margin:4px 0 0 0; font-size:10px;">Select a grid frame to resume adding images.</p>
-  </div>
-
-  <div class="section" style="border-top: 1px solid var(--border); padding-top: 16px;">
-    <h3>Grid Settings</h3>
-    
-    <div class="control-group">
+  <!-- Config Section -->
+  <h3>Grid Configuration</h3>
+  <div class="card">
+    <div class="control-row">
       <span class="label">Columns</span>
       <input type="range" id="colsRange" min="1" max="6" value="3">
       <span class="value" id="colsVal">3</span>
     </div>
 
-    <div class="control-group">
+    <div class="control-row">
       <span class="label">Gap</span>
       <input type="range" id="gapRange" min="0" max="100" value="20">
       <span class="value" id="gapVal">20</span>
     </div>
 
-    <div class="control-group">
+    <div class="control-row">
       <span class="label">Show Border</span>
-      <input type="checkbox" id="borderToggle">
+      <label class="switch">
+        <input type="checkbox" id="borderToggle">
+        <span class="slider"></span>
+      </label>
     </div>
 
     <div id="borderSettings">
-      <div class="control-group">
-        <span class="label">Width</span>
+      <div class="control-row">
+        <span class="label">Border Width</span>
         <input type="range" id="borderWRange" min="1" max="20" value="2">
         <span class="value" id="borderWVal">2</span>
       </div>
-      <div class="control-group">
-        <span class="label">Color</span>
+      <div class="control-row" style="margin-top: 12px;">
+        <span class="label">Border Color</span>
         <input type="color" id="borderColor" value="#000000">
       </div>
     </div>
   </div>
 
-  <button class="btn" id="newSessionBtn">Start New Grid Session</button>
+  <!-- Session Status -->
+  <div class="session-info">
+    <span class="label" style="color:var(--text-muted)">Active Session</span>
+    <div style="display:flex; align-items:center;">
+      <span id="sessionStatusDot" class="status-dot" style="background:#ddd;"></span>
+      <span id="sessionStatus" style="font-size:12px; font-weight:600;">None</span>
+    </div>
+  </div>
+
+  <button class="btn-primary" id="newSessionBtn">Start New Grid Session</button>
 
   <script>
     var SERVER_URL = 'wss://pinterest-figma-bridge.onrender.com';
@@ -166,9 +330,12 @@
 
     // UI Elements
     var codeDisplay = document.getElementById('codeDisplay');
+    var codeText = document.getElementById('codeText');
     var statusDot = document.getElementById('statusDot');
     var statusText = document.getElementById('statusText');
     var sessionStatus = document.getElementById('sessionStatus');
+    var sessionStatusDot = document.getElementById('sessionStatusDot');
+    
     var colsRange = document.getElementById('colsRange');
     var colsVal = document.getElementById('colsVal');
     var gapRange = document.getElementById('gapRange');
@@ -180,9 +347,9 @@
     var borderColor = document.getElementById('borderColor');
     var newSessionBtn = document.getElementById('newSessionBtn');
 
-    codeDisplay.textContent = ROOM_ID;
+    codeText.textContent = ROOM_ID;
 
-    // Copy code on click
+    // Copy code interaction
     codeDisplay.onclick = function() {
       var ta = document.createElement('textarea');
       ta.value = ROOM_ID;
@@ -190,15 +357,22 @@
       ta.select();
       document.execCommand('copy');
       document.body.removeChild(ta);
-      codeDisplay.textContent = 'COPIED';
-      setTimeout(function() { codeDisplay.textContent = ROOM_ID; }, 1000);
+      
+      var original = codeText.textContent;
+      codeText.textContent = 'COPIED!';
+      codeDisplay.style.borderColor = 'var(--success)';
+      
+      setTimeout(function() { 
+        codeText.textContent = ROOM_ID; 
+        codeDisplay.style.borderColor = 'transparent';
+      }, 1500);
     };
 
     // Settings update
     function updateSettings() {
       colsVal.textContent = colsRange.value;
-      gapVal.textContent = gapRange.value;
-      borderWVal.textContent = borderWRange.value;
+      gapVal.textContent = gapRange.value + 'px';
+      borderWVal.textContent = borderWRange.value + 'px';
       borderSettings.style.display = borderToggle.checked ? 'block' : 'none';
 
       parent.postMessage({ pluginMessage: { 
@@ -237,16 +411,16 @@
 
       if (msg.type === 'session-status') {
         var isActive = msg.status === 'Active' || msg.status === 'Resumed';
-        sessionStatus.textContent = isActive ? 'Active ✅' : 'None ⚪';
-        sessionStatus.className = 'session-status ' + (isActive ? 'status-active' : 'status-none');
+        sessionStatus.textContent = isActive ? 'Active' : 'None';
+        sessionStatus.style.color = isActive ? 'var(--success)' : 'var(--text-muted)';
+        sessionStatusDot.style.background = isActive ? 'var(--success)' : '#ddd';
+        sessionStatusDot.style.boxShadow = isActive ? '0 0 0 2px rgba(27, 196, 125, 0.2)' : 'none';
       }
     };
 
     // WebSocket connection
     function connect() {
-      if (ws) {
-        ws.close();
-      }
+      if (ws) ws.close();
       
       statusText.textContent = 'Connecting...';
       statusDot.className = 'dot';
@@ -255,20 +429,22 @@
       
       ws.onopen = function() {
         statusDot.className = 'dot connected';
-        statusText.textContent = 'Connected';
+        statusText.textContent = 'Ready to pair';
+        statusText.style.color = 'var(--text)';
         ws.send(JSON.stringify({ type: 'join', roomId: ROOM_ID }));
       };
       
       ws.onclose = function() {
         statusDot.className = 'dot';
         statusText.textContent = 'Disconnected';
-        // Reconnect after 3 seconds
+        statusText.style.color = 'var(--text-muted)';
         clearTimeout(reconnectTimer);
         reconnectTimer = setTimeout(connect, 3000);
       };
       
       ws.onerror = function() {
-        statusText.textContent = 'Error';
+        statusText.textContent = 'Connection Error';
+        statusText.style.color = 'var(--error)';
       };
       
       ws.onmessage = function(event) {
@@ -280,7 +456,9 @@
           }
           
           if (data.type === 'new-image') {
-            statusText.textContent = 'Receiving...';
+            statusText.textContent = 'Receiving Image...';
+            statusText.style.color = 'var(--primary)';
+            statusDot.classList.add('receiving');
             handleImage(data);
           }
         } catch (e) {
@@ -318,11 +496,22 @@
           } 
         }, '*');
         
-        statusText.textContent = 'Image Added';
-        setTimeout(function() { statusText.textContent = 'Connected'; }, 2000);
+        setTimeout(function() { 
+          statusText.textContent = 'Image Added'; 
+          statusText.style.color = 'var(--success)';
+          statusDot.classList.remove('receiving');
+          
+          setTimeout(function() {
+            statusText.textContent = 'Ready to pair';
+            statusText.style.color = 'var(--text)';
+          }, 2000);
+        }, 500);
+        
       } catch (e) {
         console.log('Image error:', e);
         statusText.textContent = 'Error';
+        statusText.style.color = 'var(--error)';
+        statusDot.classList.remove('receiving');
       }
     }
 
