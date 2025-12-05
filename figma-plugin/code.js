@@ -163,7 +163,10 @@ async function createCard(bytes, w, h, title, link) {
   var col = getShortestColumn(grid);
   if (col) {
     col.appendChild(card);
-    card.layoutAlign = 'STRETCH';
+    // Remove STRETCH to prevent sub-pixel resizing issues
+    // card.layoutAlign = 'STRETCH'; 
+    // Instead ensure width matches column exactly
+    card.resize(col.width, card.height);
   } else {
     grid.appendChild(card);
   }
@@ -228,7 +231,7 @@ function getGrid() {
     }
   }
   frame.x = 100;
-  frame.y = y + 100;
+  frame.y = Math.round(y + 100); // Integer positioning
   
   figma.currentPage.appendChild(frame);
   gridId = frame.id;
