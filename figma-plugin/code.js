@@ -118,7 +118,7 @@ async function createCard(bytes, w, h, title, link) {
   imageFrame.resize(cardWidth, imageHeight);
   imageFrame.fills = [{
     type: 'IMAGE',
-    scaleMode: 'FIT',
+    scaleMode: 'FILL',
     imageHash: img.hash
   }];
   card.appendChild(imageFrame);

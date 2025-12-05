@@ -137,38 +137,40 @@ function processImages() {
 
 function getHighestResImage(imgElement) {
   try {
+    // 1. Try srcset (High Quality)
     if (imgElement.srcset) {
       const sources = imgElement.srcset.split(',').map(s => {
         const parts = s.trim().split(' ');
+        const url = parts[0];
+        let width = 0;
+        
         if (parts.length >= 2) {
-           return { url: parts[0], width: parseInt(parts[1]) || 0 };
+          const wPart = parts[1];
+          if (wPart.endsWith('w')) width = parseInt(wPart);
+          else if (wPart.endsWith('x')) width = parseFloat(wPart) * 1000; // rough heuristic
         }
-        return { url: parts[0], width: 0 };
+        return { url, width };
       });
-      sources.sort((a, b) => b.width - a.width);
-      // Return the highest resolution image from srcset
-      if (sources.length > 0 && sources[0].url) {
-        return sources[0].url;
-      }
-    }
-    
-    // Fallback: Try to upgrade to higher resolution version from current src
-    // Prefer /1200x/ or /736x/ over /originals/ as they're more reliably accessible
-    const currentSrc = imgElement.src;
-    if (currentSrc.includes('pinimg.com')) {
-      // If it's already a high-res URL, use it
-      if (currentSrc.includes('/1200x/') || currentSrc.includes('/originals/') || currentSrc.includes('/736x/')) {
-        return currentSrc;
-      }
       
-      // Try to upgrade to 1200x first (most reliable high-res format)
-      if (currentSrc.match(/\/\d+x\//)) {
-        const largeUrl = currentSrc.replace(/\/\d+x\//, '/1200x/');
-        return largeUrl;
+      // Sort by width descending
+      sources.sort((a, b) => b.width - a.width);
+      
+      if (sources.length > 0) return sources[0].url;
+    }
+    
+    // 2. Try upgrading the src
+    let src = imgElement.src;
+    
+    // Pinterest specific replacements
+    if (src.includes('pinimg.com')) {
+      // Replace /236x/, /474x/, /564x/ with /originals/ or /1200x/
+      // We try /originals/ first as it is the absolute highest res
+      if (src.match(/\/\d+x\//)) {
+        return src.replace(/\/\d+x\//, '/originals/');
       }
     }
     
-    return imgElement.src;
+    return src;
   } catch (e) {
     return imgElement.src;
   }
