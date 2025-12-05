@@ -84,7 +84,7 @@ async function createCard(bytes, w, h, title, link) {
   
   // Calculate dimensions
   var ratio = (h && w) ? (h / w) : 1;
-  var cardWidth = columnWidth;
+  var cardWidth = Math.round(columnWidth);
   var imageHeight = Math.round(cardWidth * ratio);
   if (imageHeight < 10) imageHeight = 10;
   
@@ -98,6 +98,9 @@ async function createCard(bytes, w, h, title, link) {
   card.itemSpacing = 0;
   card.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
   card.cornerRadius = 12;
+  // Snapping to pixel grid
+  card.x = Math.round(card.x);
+  card.y = Math.round(card.y);
   card.effects = [{
     type: 'DROP_SHADOW',
     color: { r: 0, g: 0, b: 0, a: 0.1 },
@@ -136,7 +139,7 @@ async function createCard(bytes, w, h, title, link) {
   var titleText = figma.createText();
   titleText.fontName = { family: "Inter", style: "Bold" };
   titleText.characters = title || "Untitled Pin";
-  titleText.fontSize = 12;
+  titleText.fontSize = 14;
   titleText.layoutAlign = "STRETCH";
   titleText.textAutoResize = "HEIGHT";
   content.appendChild(titleText);
@@ -146,7 +149,7 @@ async function createCard(bytes, w, h, title, link) {
     var linkText = figma.createText();
     linkText.fontName = { family: "Inter", style: "Regular" };
     linkText.characters = "Open in Pinterest ↗";
-    linkText.fontSize = 10;
+    linkText.fontSize = 11;
     linkText.fills = [{ type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 } }]; // Gray
     linkText.layoutAlign = "STRETCH";
     linkText.textAutoResize = "HEIGHT";
