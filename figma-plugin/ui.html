@@ -124,10 +124,24 @@
         statusText.textContent = 'Receiving...';
         errorLog.textContent = 'Got image: ' + data.url.substring(0, 30) + '...';
         try {
-          const response = await fetch(data.url);
-          const blob = await response.blob();
-          const buffer = await blob.arrayBuffer();
-          const bytes = new Uint8Array(buffer);
+          let bytes;
+          
+          // Check if it's a data URL (base64) or regular URL
+          if (data.url.startsWith('data:')) {
+            // Data URL - decode base64 directly
+            const base64Data = data.url.split(',')[1];
+            const binaryString = atob(base64Data);
+            bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+          } else {
+            // Regular URL - fetch it
+            const response = await fetch(data.url);
+            const blob = await response.blob();
+            const buffer = await blob.arrayBuffer();
+            bytes = new Uint8Array(buffer);
+          }
           
           // Convert Uint8Array to regular Array for postMessage serialization
           const bytesArray = Array.from(bytes);

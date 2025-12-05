@@ -17,7 +17,7 @@ const io = new Server(server, {
 });
 
 // Endpoint for Chrome Extension (HTTP POST) -> Socket Room
-app.post('/send-image-http', (req, res) => {
+app.post('/send-image-http', async (req, res) => {
   const { roomId, url, width, height } = req.body;
   
   if (!roomId || !url) {
@@ -26,16 +26,33 @@ app.post('/send-image-http', (req, res) => {
 
   console.log(`Bridge: Sending image to Room ${roomId}: ${url.substring(0, 30)}...`);
   
-  // Broadcast to the specific room
-  // io.to(roomId) sends to everyone in the room
-  io.to(roomId).emit('new-image', { 
-    url, 
-    width, 
-    height, 
-    timestamp: Date.now() 
-  });
-  
-  res.send({ success: true });
+  // Fetch the image and convert to base64 to avoid CORS issues
+  try {
+    const imageResponse = await fetch(url);
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+    const imageDataUrl = `data:${imageResponse.headers.get('content-type') || 'image/jpeg'};base64,${imageBase64}`;
+    
+    // Broadcast to the specific room with data URL instead of original URL
+    io.to(roomId).emit('new-image', { 
+      url: imageDataUrl,  // Use data URL to avoid CORS
+      width, 
+      height, 
+      timestamp: Date.now() 
+    });
+    
+    res.send({ success: true });
+  } catch (err) {
+    console.error('Error fetching image:', err);
+    // Fallback: send original URL anyway
+    io.to(roomId).emit('new-image', { 
+      url, 
+      width, 
+      height, 
+      timestamp: Date.now() 
+    });
+    res.send({ success: true, warning: 'Could not proxy image' });
+  }
 });
 
 io.on('connection', (socket) => {
