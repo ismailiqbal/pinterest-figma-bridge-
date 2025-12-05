@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { width: 280px; padding: 15px; font-family: -apple-system, sans-serif; }
+    h3 { margin-top: 0; font-size: 16px; margin-bottom: 15px; text-align: center; }
+    
+    .input-group { margin-bottom: 15px; }
+    label { display: block; font-size: 11px; color: #666; margin-bottom: 4px; }
+    input { width: 100%; padding: 8px; box-sizing: border-box; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; }
+    input#code { font-size: 18px; letter-spacing: 2px; text-align: center; font-family: monospace; }
+    
+    button { width: 100%; padding: 10px; background: #E60023; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; }
+    button:hover { background: #ad001a; }
+    button:disabled { background: #ccc; }
+    
+    .status { margin-top: 15px; font-size: 12px; color: #666; text-align: center; border-top: 1px solid #eee; padding-top: 10px; }
+    
+    .settings-toggle { text-align: right; margin-bottom: 10px; }
+    .settings-toggle a { font-size: 10px; color: #999; text-decoration: none; cursor: pointer; }
+    
+    #serverSection { display: none; margin-bottom: 15px; background: #f9f9f9; padding: 10px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="settings-toggle">
+    <a id="toggleSettings">Server Settings ⚙️</a>
+  </div>
+
+  <h3>Connect to Figma</h3>
+  
+  <div id="serverSection">
+    <label>Bridge Server URL</label>
+    <input type="text" id="serverUrl" placeholder="https://..." value="http://localhost:3333">
+  </div>
+  
+  <div class="input-group">
+    <label>Pairing Code (from Figma)</label>
+    <input type="text" id="code" placeholder="123456" maxlength="6">
+  </div>
+  
+  <button id="connectBtn">Connect</button>
+  
+  <div class="status" id="status">Not Connected</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

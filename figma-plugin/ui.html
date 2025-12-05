@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Inter, sans-serif; padding: 20px; text-align: center; color: #333; }
+    h2 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+    .code-box {
+      background: #F0F0F0; border: 1px solid #E5E5E5; border-radius: 8px;
+      padding: 16px; margin: 16px 0; font-family: 'Courier New', monospace;
+      font-size: 24px; letter-spacing: 4px; font-weight: bold; color: #333; user-select: text; cursor: pointer;
+    }
+    .status { font-size: 12px; color: #888; margin-top: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; display: inline-block; }
+    .dot.connected { background: #00C853; box-shadow: 0 0 4px #00C853; }
+    .error-log { color: #E00; font-size: 10px; margin-top: 5px; max-width: 100%; word-break: break-all; }
+    
+    .settings { margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px; text-align: left; }
+    .settings summary { font-size: 11px; color: #888; cursor: pointer; }
+    .settings input { width: 100%; box-sizing: border-box; padding: 6px; margin-top: 5px; font-size: 12px; border: 1px solid #ddd; border-radius: 4px; }
+    .settings button { margin-top: 5px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #eee; border: none; border-radius: 3px; }
+    
+    p { font-size: 11px; color: #666; line-height: 1.4; }
+  </style>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+  <h2>Pinterest Bridge</h2>
+  
+  <div class="code-box" id="codeDisplay" title="Click to copy">...</div>
+  
+  <div class="status">
+    <div>
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">Connecting...</span>
+    </div>
+    <div id="errorLog" class="error-log"></div>
+  </div>
+
+  <details class="settings">
+    <summary>Server Settings</summary>
+    <input type="text" id="serverUrl" placeholder="https://your-app.herokuapp.com" value="http://localhost:3333">
+    <button id="saveBtn">Save & Reconnect</button>
+  </details>
+
+  <script>
+    // 1. Get Stored URL or Default
+    let SERVER_URL = 'http://localhost:3333';
+    
+    // We can't use localStorage in Figma Plugin UI iframe easily as it might be wiped
+    // But we can try parent.postMessage to store in Figma clientStorage if needed.
+    // For now, let's just use the input value.
+
+    const codeDisplay = document.getElementById('codeDisplay');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const errorLog = document.getElementById('errorLog');
+    const serverInput = document.getElementById('serverUrl');
+    const saveBtn = document.getElementById('saveBtn');
+
+    let socket = null;
+    let ROOM_ID = Math.floor(100000 + Math.random() * 900000).toString();
+    codeDisplay.textContent = ROOM_ID;
+
+    // Copy Code on Click
+    codeDisplay.addEventListener('click', () => {
+      const ta = document.createElement('textarea');
+      ta.value = ROOM_ID;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      const original = codeDisplay.textContent;
+      codeDisplay.textContent = 'COPIED';
+      setTimeout(() => codeDisplay.textContent = original, 1000);
+    });
+
+    function connect() {
+      if (socket) socket.disconnect();
+
+      SERVER_URL = serverInput.value.replace(/\/$/, ''); // Trim trailing slash
+      
+      console.log('Connecting to:', SERVER_URL);
+      statusText.textContent = 'Connecting...';
+      statusDot.className = 'dot';
+      errorLog.textContent = '';
+
+      // Auto-detect if we should use polling (for localhost/http mixed content) 
+      // or websockets (for production https)
+      const isLocal = SERVER_URL.includes('localhost') || SERVER_URL.includes('127.0.0.1');
+      const transports = isLocal ? ['polling'] : ['websocket', 'polling'];
+
+      socket = io(SERVER_URL, {
+        transports: transports,
+        reconnectionAttempts: 10,
+        timeout: 10000
+      });
+
+      socket.on('connect', () => {
+        statusDot.classList.add('connected');
+        statusText.textContent = 'Connected & Ready';
+        errorLog.textContent = '';
+        socket.emit('join-room', ROOM_ID);
+      });
+
+      socket.on('connect_error', (err) => {
+        statusDot.classList.remove('connected');
+        statusText.textContent = 'Connection Error';
+        errorLog.textContent = err.message + (isLocal ? ' (Try allow mixed content)' : '');
+      });
+
+      socket.on('disconnect', () => {
+        statusDot.classList.remove('connected');
+        statusText.textContent = 'Disconnected';
+      });
+
+      socket.on('new-image', async (data) => {
+        statusText.textContent = 'Receiving...';
+        try {
+          const response = await fetch(data.url);
+          const blob = await response.blob();
+          const buffer = await blob.arrayBuffer();
+          const bytes = new Uint8Array(buffer);
+
+          parent.postMessage({ 
+            pluginMessage: { 
+              type: 'create-image', 
+              bytes: bytes,
+              width: data.width,
+              height: data.height
+            } 
+          }, '*');
+
+          statusText.textContent = 'Image added!';
+          setTimeout(() => { statusText.textContent = 'Connected & Ready'; }, 2000);
+        } catch (err) {
+          console.error('Error fetching image:', err);
+          statusText.textContent = 'Error downloading';
+          errorLog.textContent = err.message;
+        }
+      });
+    }
+
+    saveBtn.addEventListener('click', connect);
+
+    // Initial Connect
+    connect();
+  </script>
+</body>
+</html>
