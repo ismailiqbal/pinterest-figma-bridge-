@@ -99,8 +99,24 @@ function findEmptyArea() {
   
   // Find safe starting position: below all existing content with padding
   const SAFE_MARGIN = 50;
-  const startX = Math.max(100, minX); // Start at left margin or align with existing content
-  const startY = maxY + SAFE_MARGIN; // Start below everything with margin
+  
+  // Validate and ensure we have valid numbers (handle Infinity/NaN cases)
+  let startX = 100; // Default fallback
+  let startY = 100; // Default fallback
+  
+  if (isFinite(minX) && isFinite(maxX)) {
+    startX = Math.max(100, minX);
+  }
+  
+  if (isFinite(maxY)) {
+    startY = maxY + SAFE_MARGIN;
+  } else if (isFinite(minY)) {
+    startY = minY + SAFE_MARGIN;
+  }
+  
+  // Final validation - ensure no NaN
+  if (!isFinite(startX) || isNaN(startX)) startX = 100;
+  if (!isFinite(startY) || isNaN(startY)) startY = 100;
   
   return { x: startX, y: startY };
 }
