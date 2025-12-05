@@ -2,35 +2,155 @@
 <html>
 <head>
   <style>
-    body { width: 280px; padding: 15px; font-family: -apple-system, sans-serif; }
-    h3 { margin-top: 0; font-size: 16px; margin-bottom: 15px; text-align: center; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+    :root {
+      --bg: #050505;
+      --card-bg: #111111;
+      --text: #FFFFFF;
+      --text-muted: #666666;
+      --primary: #3B82F6;
+      --accent: #10B981;
+      --border: #222222;
+      --radius: 12px;
+      --transition: all 0.25s ease;
+    }
     
-    .input-group { margin-bottom: 15px; }
-    label { display: block; font-size: 11px; color: #666; margin-bottom: 4px; }
-    input { width: 100%; padding: 8px; box-sizing: border-box; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; }
-    input#code { font-size: 18px; letter-spacing: 2px; text-align: center; font-family: monospace; }
+    body { 
+      width: 280px;
+      font-family: 'Inter', sans-serif; 
+      padding: 20px; 
+      color: var(--text); 
+      margin: 0; 
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Typography */
+    h3 { 
+      font-size: 13px; 
+      font-weight: 500; 
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin: 0 0 24px 0;
+      text-align: center;
+    }
+
+    /* Inputs */
+    .input-group { margin-bottom: 20px; }
     
-    button { width: 100%; padding: 10px; background: #E60023; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; }
-    button:hover { background: #ad001a; }
-    button:disabled { background: #ccc; }
+    label { 
+      display: block; 
+      font-size: 11px; 
+      color: var(--text-muted); 
+      margin-bottom: 8px; 
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
     
-    .status { margin-top: 15px; font-size: 12px; color: #666; text-align: center; border-top: 1px solid #eee; padding-top: 10px; }
+    input { 
+      width: 100%; 
+      padding: 14px; 
+      box-sizing: border-box; 
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      outline: none;
+      transition: var(--transition);
+    }
     
-    .settings-toggle { text-align: right; margin-bottom: 10px; }
-    .settings-toggle a { font-size: 10px; color: #999; text-decoration: none; cursor: pointer; }
+    input:focus {
+      border-color: #444;
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.05);
+    }
+
+    input#code { 
+      font-size: 24px; 
+      letter-spacing: 4px; 
+      text-align: center; 
+      font-family: 'Inter', monospace;
+      font-weight: 600;
+    }
     
-    #serverSection { display: none; margin-bottom: 15px; background: #f9f9f9; padding: 10px; border-radius: 4px; }
+    /* Button */
+    button { 
+      width: 100%; 
+      padding: 14px; 
+      background: var(--text); 
+      color: var(--bg); 
+      border: none; 
+      border-radius: var(--radius); 
+      cursor: pointer; 
+      font-weight: 600; 
+      font-size: 13px; 
+      transition: var(--transition);
+      letter-spacing: 0.02em;
+    }
+    
+    button:hover { 
+      background: #E0E0E0; 
+      transform: translateY(-1px);
+      box-shadow: 0 0 15px rgba(255,255,255,0.1);
+    }
+    
+    button:active {
+      transform: scale(0.98);
+    }
+    
+    button:disabled { 
+      background: #333; 
+      color: #666;
+      transform: none;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+    
+    /* Status */
+    .status { 
+      margin-top: 20px; 
+      font-size: 11px; 
+      color: var(--text-muted); 
+      text-align: center; 
+      padding-top: 16px; 
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    
+    .status::before {
+      content: '';
+      display: inline-block;
+      width: 6px; 
+      height: 6px; 
+      border-radius: 50%; 
+      background: #444;
+      transition: var(--transition);
+    }
+    
+    .status.connected { color: var(--accent); }
+    .status.connected::before { 
+      background: var(--accent); 
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+    }
+    
   </style>
 </head>
 <body>
-  <h3>Connect to Figma</h3>
+  <h3>Pinterest Bridge</h3>
   
   <div class="input-group">
-    <label>Pairing Code (from Figma)</label>
-    <input type="text" id="code" placeholder="123456" maxlength="6">
+    <label>Pairing Code</label>
+    <input type="text" id="code" placeholder="000000" maxlength="6" autocomplete="off">
   </div>
   
-  <button id="connectBtn">Connect</button>
+  <button id="connectBtn">Connect to Figma</button>
   
   <div class="status" id="status">Not Connected</div>
 

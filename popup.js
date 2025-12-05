@@ -7,7 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
   chrome.storage.local.get(['figmaRoomId'], (result) => {
     if (result.figmaRoomId) {
       codeInput.value = result.figmaRoomId;
-      statusDiv.textContent = 'Saved Code: ' + result.figmaRoomId;
+      statusDiv.textContent = 'Active Room: ' + result.figmaRoomId;
+      statusDiv.classList.add('connected');
     }
   });
 
@@ -16,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (code.length < 4) {
       statusDiv.textContent = 'Invalid Code';
+      statusDiv.classList.remove('connected');
       return;
     }
 
@@ -23,8 +25,8 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.storage.local.set({ 
       figmaRoomId: code
     }, () => {
-      statusDiv.textContent = 'Connected to Room ' + code;
-      statusDiv.style.color = 'green';
+      statusDiv.textContent = 'Connected';
+      statusDiv.classList.add('connected');
       
       // Notify background script
       chrome.runtime.sendMessage({ action: 'updateConfig' });
