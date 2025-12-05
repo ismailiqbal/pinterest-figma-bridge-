@@ -63,7 +63,14 @@ async function handleSendToBridge(data) {
     const result = await response.json();
     console.log('Extension: Server response', result);
     
-    if (!response.ok) throw new Error('Bridge server error ' + response.status);
+    if (!response.ok) {
+      const errorMsg = result.error || `Bridge server error ${response.status}`;
+      throw new Error(errorMsg);
+    }
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Server returned failure');
+    }
     
   } catch (err) {
     console.error('Bridge Error:', err);

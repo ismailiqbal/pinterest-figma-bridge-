@@ -83,19 +83,31 @@ function processImages() {
 
         try {
            const src = getHighestResImage(img);
-           await chrome.runtime.sendMessage({
+           const response = await chrome.runtime.sendMessage({
              action: "sendToBridge",
              url: src,
              width: img.naturalWidth,
              height: img.naturalHeight
            });
            
-           btn.innerHTML = `Sent!`;
-           btn.style.color = '#00C853';
+           if (response && response.success) {
+             btn.innerHTML = `Sent!`;
+             btn.style.color = '#00C853';
+           } else {
+             throw new Error(response?.error || 'Failed to send image');
+           }
         } catch (err) {
            console.error('Send failed', err);
            btn.innerHTML = 'Error';
-           alert("Connect Extension to Figma first!");
+           btn.style.color = '#E00';
+           const errorMsg = err.message || 'Unknown error';
+           if (errorMsg.includes('Connect') || errorMsg.includes('roomId')) {
+             alert("Connect Extension to Figma first! Click the extension icon and enter the pairing code.");
+           } else if (errorMsg.includes('blocked') || errorMsg.includes('fetch')) {
+             alert("Image blocked by Pinterest. Try a different image or check your connection.");
+           } else {
+             alert("Error: " + errorMsg);
+           }
         }
 
         setTimeout(() => {
@@ -123,28 +135,26 @@ function getHighestResImage(imgElement) {
         return { url: parts[0], width: 0 };
       });
       sources.sort((a, b) => b.width - a.width);
-      // Return the highest resolution image
+      // Return the highest resolution image from srcset
       if (sources.length > 0 && sources[0].url) {
         return sources[0].url;
       }
     }
     
-    // Fallback: Try to get original/high-res version from current src
-    // Pinterest URLs often have size in path like /236x/ or /736x/ - try to get original
+    // Fallback: Try to upgrade to higher resolution version from current src
+    // Prefer /1200x/ or /736x/ over /originals/ as they're more reliably accessible
     const currentSrc = imgElement.src;
     if (currentSrc.includes('pinimg.com')) {
-      // Try to get original by removing size constraints
-      // Original format: https://i.pinimg.com/originals/...
-      // Or try: https://i.pinimg.com/564x/... (larger) or remove size entirely
-      const originalUrl = currentSrc.replace(/\/\d+x\/\d+\//, '/originals/')
-                                    .replace(/\/\d+x\//, '/originals/');
-      // If that doesn't work, try the largest common size (1200x or 564x)
-      if (!originalUrl.includes('originals')) {
-        // Try 1200x which is often the largest available
+      // If it's already a high-res URL, use it
+      if (currentSrc.includes('/1200x/') || currentSrc.includes('/originals/') || currentSrc.includes('/736x/')) {
+        return currentSrc;
+      }
+      
+      // Try to upgrade to 1200x first (most reliable high-res format)
+      if (currentSrc.match(/\/\d+x\//)) {
         const largeUrl = currentSrc.replace(/\/\d+x\//, '/1200x/');
         return largeUrl;
       }
-      return originalUrl;
     }
     
     return imgElement.src;
