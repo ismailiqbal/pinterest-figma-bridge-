@@ -162,12 +162,20 @@ figma.ui.onmessage = async (msg) => {
       let finalWidth = width || 400;
       let finalHeight = height || 400;
       
+      // Validate dimensions (prevent NaN)
+      if (!isFinite(finalWidth) || isNaN(finalWidth) || finalWidth <= 0) finalWidth = 400;
+      if (!isFinite(finalHeight) || isNaN(finalHeight) || finalHeight <= 0) finalHeight = 400;
+      
       // Maintain aspect ratio if we need to scale down
       if (finalWidth > MAX_DIMENSION || finalHeight > MAX_DIMENSION) {
         const scale = Math.min(MAX_DIMENSION / finalWidth, MAX_DIMENSION / finalHeight);
         finalWidth = finalWidth * scale;
         finalHeight = finalHeight * scale;
       }
+      
+      // Final validation before resize
+      if (!isFinite(finalWidth) || isNaN(finalWidth)) finalWidth = 400;
+      if (!isFinite(finalHeight) || isNaN(finalHeight)) finalHeight = 400;
 
       // Resize the node to original dimensions (or scaled if too large)
       node.resize(finalWidth, finalHeight);
