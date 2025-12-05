@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), clipboard-write=(), display-capture=()">
   <style>
     :root {
       --primary: #000000;
@@ -22,12 +21,10 @@
       background: var(--bg);
     }
 
-    /* Typography */
     h2 { font-size: 16px; font-weight: 600; margin: 0 0 12px 0; }
     h3 { font-size: 12px; font-weight: 600; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.5px; }
     p { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
 
-    /* Components */
     .section { margin-bottom: 24px; }
     
     .code-box {
@@ -57,7 +54,6 @@
     .dot { width: 6px; height: 6px; border-radius: 50%; background: #ccc; }
     .dot.connected { background: var(--accent); box-shadow: 0 0 4px var(--accent); }
 
-    /* Forms */
     .control-group { 
       display: flex; 
       align-items: center; 
@@ -68,14 +64,6 @@
     .value { font-size: 11px; font-weight: 600; min-width: 24px; text-align: right; }
     
     input[type="range"] { flex: 1; margin: 0 12px; }
-    input[type="number"] { 
-      width: 48px; 
-      padding: 4px; 
-      border: 1px solid var(--border); 
-      border-radius: 4px; 
-      font-size: 11px;
-      text-align: center;
-    }
     input[type="color"] {
       width: 40px; height: 24px; 
       border: 1px solid var(--border); 
@@ -84,7 +72,6 @@
       padding: 0;
     }
 
-    /* Buttons */
     .btn {
       width: 100%;
       padding: 10px;
@@ -97,10 +84,7 @@
       transition: background 0.2s;
     }
     .btn:hover { background: #EBEBEB; }
-    .btn-primary { background: var(--primary); color: white; border: none; }
-    .btn-primary:hover { background: #333; }
 
-    /* Dynamic UI */
     #borderSettings {
       padding-top: 12px;
       margin-top: 12px;
@@ -114,28 +98,23 @@
       border-radius: var(--radius);
       padding: 12px;
       margin-bottom: 12px;
-      text-align: left;
     }
     .session-status { font-weight: 600; font-size: 11px; }
     .status-active { color: var(--accent); }
     .status-none { color: var(--text-muted); }
   </style>
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 </head>
 <body>
 
-  <!-- Pairing Section -->
   <div class="section">
     <h2>Pinterest Bridge</h2>
-    <div class="code-box" id="codeDisplay" title="Click to copy">...</div>
+    <div class="code-box" id="codeDisplay">...</div>
     <div class="status-badge">
       <span class="dot" id="statusDot"></span>
       <span id="statusText">Connecting...</span>
     </div>
-    <div id="errorLog" style="color:red; font-size:10px; margin-top:4px;"></div>
   </div>
 
-  <!-- Session Info -->
   <div class="session-card">
     <div style="display:flex; justify-content:space-between; align-items:center;">
       <span class="label">Session Status</span>
@@ -144,7 +123,6 @@
     <p style="margin:4px 0 0 0; font-size:10px;">Select a grid frame to resume adding images.</p>
   </div>
 
-  <!-- Settings Section -->
   <div class="section" style="border-top: 1px solid var(--border); padding-top: 16px;">
     <h3>Grid Settings</h3>
     
@@ -181,170 +159,176 @@
   <button class="btn" id="newSessionBtn">Start New Grid Session</button>
 
   <script>
-    // --- Constants ---
-    const SERVER_URL = 'https://pinterest-figma-bridge.onrender.com';
-    const ROOM_ID = Math.floor(100000 + Math.random() * 900000).toString();
+    var SERVER_URL = 'wss://pinterest-figma-bridge.onrender.com';
+    var ROOM_ID = Math.floor(100000 + Math.random() * 900000).toString();
+    var ws = null;
+    var reconnectTimer = null;
 
-    // --- State ---
-    let state = {
-      columns: 3,
-      gap: 20,
-      showBorder: false,
-      borderWidth: 2,
-      borderColor: '#000000'
-    };
+    // UI Elements
+    var codeDisplay = document.getElementById('codeDisplay');
+    var statusDot = document.getElementById('statusDot');
+    var statusText = document.getElementById('statusText');
+    var sessionStatus = document.getElementById('sessionStatus');
+    var colsRange = document.getElementById('colsRange');
+    var colsVal = document.getElementById('colsVal');
+    var gapRange = document.getElementById('gapRange');
+    var gapVal = document.getElementById('gapVal');
+    var borderToggle = document.getElementById('borderToggle');
+    var borderSettings = document.getElementById('borderSettings');
+    var borderWRange = document.getElementById('borderWRange');
+    var borderWVal = document.getElementById('borderWVal');
+    var borderColor = document.getElementById('borderColor');
+    var newSessionBtn = document.getElementById('newSessionBtn');
 
-    // --- UI Elements ---
-    const els = {
-      code: document.getElementById('codeDisplay'),
-      statusDot: document.getElementById('statusDot'),
-      statusText: document.getElementById('statusText'),
-      error: document.getElementById('errorLog'),
-      sessionStatus: document.getElementById('sessionStatus'),
-      colsRange: document.getElementById('colsRange'),
-      colsVal: document.getElementById('colsVal'),
-      gapRange: document.getElementById('gapRange'),
-      gapVal: document.getElementById('gapVal'),
-      borderToggle: document.getElementById('borderToggle'),
-      borderSettings: document.getElementById('borderSettings'),
-      borderWRange: document.getElementById('borderWRange'),
-      borderWVal: document.getElementById('borderWVal'),
-      borderColor: document.getElementById('borderColor'),
-      newSessionBtn: document.getElementById('newSessionBtn')
-    };
+    codeDisplay.textContent = ROOM_ID;
 
-    // --- Initialization ---
-    els.code.textContent = ROOM_ID;
-    
-    // --- Event Listeners ---
-    
-    // Copy Code
-    els.code.addEventListener('click', () => {
-      const ta = document.createElement('textarea');
+    // Copy code on click
+    codeDisplay.onclick = function() {
+      var ta = document.createElement('textarea');
       ta.value = ROOM_ID;
       document.body.appendChild(ta);
       ta.select();
       document.execCommand('copy');
       document.body.removeChild(ta);
-      els.code.textContent = 'COPIED';
-      setTimeout(() => els.code.textContent = ROOM_ID, 1000);
-    });
-
-    // Inputs
-    const update = () => {
-      state.columns = parseInt(els.colsRange.value);
-      state.gap = parseInt(els.gapRange.value);
-      state.showBorder = els.borderToggle.checked;
-      state.borderWidth = parseInt(els.borderWRange.value);
-      state.borderColor = els.borderColor.value;
-      
-      // Update UI labels
-      els.colsVal.textContent = state.columns;
-      els.gapVal.textContent = state.gap;
-      els.borderWVal.textContent = state.borderWidth;
-      els.borderSettings.style.display = state.showBorder ? 'block' : 'none';
-
-      // Send to Plugin
-      parent.postMessage({ pluginMessage: { 
-        type: 'update-config', 
-        columns: state.columns,
-        gap: state.gap,
-        showBorder: state.showBorder,
-        borderWidth: state.borderWidth,
-        borderColor: state.borderColor
-      } }, '*');
+      codeDisplay.textContent = 'COPIED';
+      setTimeout(function() { codeDisplay.textContent = ROOM_ID; }, 1000);
     };
 
-    [els.colsRange, els.gapRange, els.borderWRange, els.borderColor, els.borderToggle]
-      .forEach(el => el.addEventListener('input', update));
+    // Settings update
+    function updateSettings() {
+      colsVal.textContent = colsRange.value;
+      gapVal.textContent = gapRange.value;
+      borderWVal.textContent = borderWRange.value;
+      borderSettings.style.display = borderToggle.checked ? 'block' : 'none';
 
-    els.newSessionBtn.addEventListener('click', () => {
+      parent.postMessage({ pluginMessage: { 
+        type: 'update-config', 
+        columns: parseInt(colsRange.value),
+        gap: parseInt(gapRange.value),
+        showBorder: borderToggle.checked,
+        borderWidth: parseInt(borderWRange.value),
+        borderColor: borderColor.value
+      } }, '*');
+    }
+
+    colsRange.oninput = updateSettings;
+    gapRange.oninput = updateSettings;
+    borderToggle.oninput = updateSettings;
+    borderWRange.oninput = updateSettings;
+    borderColor.oninput = updateSettings;
+
+    newSessionBtn.onclick = function() {
       parent.postMessage({ pluginMessage: { type: 'reset-session' } }, '*');
-    });
+    };
 
-    // --- Message Handling ---
-    window.addEventListener('message', (e) => {
-      const msg = e.data.pluginMessage;
+    // Plugin messages
+    window.onmessage = function(e) {
+      var msg = e.data.pluginMessage;
       if (!msg) return;
 
       if (msg.type === 'config-loaded') {
-        Object.assign(state, msg);
-        els.colsRange.value = state.columns;
-        els.gapRange.value = state.gap;
-        els.borderToggle.checked = state.showBorder;
-        els.borderWRange.value = state.borderWidth;
-        els.borderColor.value = state.borderColor;
-        update(); // Sync UI text
+        colsRange.value = msg.columns || 3;
+        gapRange.value = msg.gap || 20;
+        borderToggle.checked = msg.showBorder || false;
+        borderWRange.value = msg.borderWidth || 2;
+        borderColor.value = msg.borderColor || '#000000';
+        updateSettings();
       }
 
       if (msg.type === 'session-status') {
-        const isActive = msg.status === 'Active' || msg.status === 'Resumed';
-        els.sessionStatus.textContent = isActive ? 'Active ✅' : 'None ⚪';
-        els.sessionStatus.className = `session-status ${isActive ? 'status-active' : 'status-none'}`;
+        var isActive = msg.status === 'Active' || msg.status === 'Resumed';
+        sessionStatus.textContent = isActive ? 'Active ✅' : 'None ⚪';
+        sessionStatus.className = 'session-status ' + (isActive ? 'status-active' : 'status-none');
       }
-    });
+    };
 
-    // --- Socket Logic ---
-    let socket;
-
+    // WebSocket connection
     function connect() {
-      if (socket) socket.disconnect();
+      if (ws) {
+        ws.close();
+      }
       
-      els.statusText.textContent = 'Connecting...';
+      statusText.textContent = 'Connecting...';
+      statusDot.className = 'dot';
       
-      socket = io(SERVER_URL, {
-        transports: ['websocket', 'polling'],
-        reconnectionAttempts: 5
-      });
-
-      socket.on('connect', () => {
-        els.statusDot.classList.add('connected');
-        els.statusText.textContent = 'Connected';
-        socket.emit('join-room', ROOM_ID);
-      });
-
-      socket.on('disconnect', () => {
-        els.statusDot.classList.remove('connected');
-        els.statusText.textContent = 'Disconnected';
-      });
-
-      socket.on('new-image', async (data) => {
-        els.statusText.textContent = 'Receiving...';
+      ws = new WebSocket(SERVER_URL);
+      
+      ws.onopen = function() {
+        statusDot.className = 'dot connected';
+        statusText.textContent = 'Connected';
+        ws.send(JSON.stringify({ type: 'join', roomId: ROOM_ID }));
+      };
+      
+      ws.onclose = function() {
+        statusDot.className = 'dot';
+        statusText.textContent = 'Disconnected';
+        // Reconnect after 3 seconds
+        clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(connect, 3000);
+      };
+      
+      ws.onerror = function() {
+        statusText.textContent = 'Error';
+      };
+      
+      ws.onmessage = function(event) {
         try {
-          let bytes;
-          if (data.url.startsWith('data:')) {
-            const base64 = data.url.split(',')[1];
-            const bin = atob(base64);
-            bytes = new Uint8Array(bin.length);
-            for (let i=0; i<bin.length; i++) bytes[i] = bin.charCodeAt(i);
-          } else {
-            const resp = await fetch(data.url);
-            bytes = new Uint8Array(await resp.arrayBuffer());
-          }
-
-          parent.postMessage({ 
-            pluginMessage: { 
-              type: 'create-image', 
-              bytes: Array.from(bytes),
-              width: data.width, 
-              height: data.height 
-            } 
-          }, '*');
+          var data = JSON.parse(event.data);
           
-          els.statusText.textContent = 'Image Added';
-          setTimeout(() => els.statusText.textContent = 'Connected', 2000);
-        } catch (err) {
-          console.error(err);
-          els.statusText.textContent = 'Error';
-          els.error.textContent = 'Download failed';
+          if (data.type === 'joined') {
+            console.log('Joined room:', data.roomId);
+          }
+          
+          if (data.type === 'new-image') {
+            statusText.textContent = 'Receiving...';
+            handleImage(data);
+          }
+        } catch (e) {
+          console.log('Message parse error:', e);
         }
-      });
+      };
     }
 
-    // Init
+    function handleImage(data) {
+      try {
+        var bytes;
+        if (data.url.indexOf('data:') === 0) {
+          var base64 = data.url.split(',')[1];
+          var bin = atob(base64);
+          bytes = new Uint8Array(bin.length);
+          for (var i = 0; i < bin.length; i++) {
+            bytes[i] = bin.charCodeAt(i);
+          }
+        } else {
+          statusText.textContent = 'Invalid URL';
+          return;
+        }
+
+        var arr = [];
+        for (var j = 0; j < bytes.length; j++) {
+          arr.push(bytes[j]);
+        }
+
+        parent.postMessage({ 
+          pluginMessage: { 
+            type: 'create-image', 
+            bytes: arr,
+            width: data.width, 
+            height: data.height 
+          } 
+        }, '*');
+        
+        statusText.textContent = 'Image Added';
+        setTimeout(function() { statusText.textContent = 'Connected'; }, 2000);
+      } catch (e) {
+        console.log('Image error:', e);
+        statusText.textContent = 'Error';
+      }
+    }
+
+    // Initialize
     connect();
     parent.postMessage({ pluginMessage: { type: 'get-config' } }, '*');
-
   </script>
 </body>
 </html>

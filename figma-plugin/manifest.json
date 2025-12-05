@@ -8,8 +8,7 @@
   "networkAccess": {
     "allowedDomains": [
       "https://pinterest-figma-bridge.onrender.com",
-      "wss://pinterest-figma-bridge.onrender.com",
-      "https://cdn.socket.io"
+      "wss://pinterest-figma-bridge.onrender.com"
     ]
   }
 }
