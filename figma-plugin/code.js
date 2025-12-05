@@ -31,95 +31,79 @@ async function saveGridState() {
   }
 }
 
-// Get all nodes on the page using Figma's findAll API (more reliable)
-function getAllPageNodes() {
-  const page = figma.currentPage;
-  const allNodes = [];
-  
-  // Use findAll to get ALL nodes recursively (handles frames, groups, etc.)
-  // This is the recommended way per Figma API
-  try {
-    // Find all nodes except the page itself
-    const nodes = page.findAll();
-    // Filter out the page node itself
-    return nodes.filter(node => node.type !== 'PAGE');
-  } catch (e) {
-    // Fallback: manual recursion
-    function traverse(node) {
-      if (node.type !== 'PAGE') {
-        allNodes.push(node);
-      }
-      if ('children' in node) {
-        for (const child of node.children) {
-          traverse(child);
-        }
-      }
-    }
-    traverse(page);
-    return allNodes;
-  }
-}
-
-// Find empty area on the page using absoluteBoundingBox for accurate bounds
+// Find empty area on the page by looking at TOP-LEVEL nodes only
+// We don't need to recurse deep; top-level frames/groups define the layout structure.
 function findEmptyArea() {
-  const allNodes = getAllPageNodes();
+  const page = figma.currentPage;
+  const topLevelNodes = page.children;
   
-  if (allNodes.length === 0) {
-    // Page is empty, start at top-left with margin
-    return { x: 100, y: 100 };
+  if (topLevelNodes.length === 0) {
+    // Page is completely empty
+    return { x: 0, y: 0 };
   }
   
-  // Calculate bounding box of all existing nodes using absoluteBoundingBox
-  // absoluteBoundingBox gives page-relative coordinates (handles frames, groups, etc.)
   let minX = Infinity;
-  let minY = Infinity;
   let maxX = -Infinity;
   let maxY = -Infinity;
-  let hasValidBounds = false;
+  let hasContent = false;
   
-  allNodes.forEach(node => {
-    // Use absoluteBoundingBox - this is the correct way per Figma API
-    // It gives page coordinates even for nodes inside frames
+  for (const node of topLevelNodes) {
+    // We use absoluteBoundingBox because it accounts for rotation/position correctly
+    // For top-level nodes, x/y is usually sufficient, but absolute is safer.
+    
+    // Skip our own grid images if we want to append to them (optional, handled by gridState)
+    // But here we want to find the "bottom" of the page content to potentially start a new grid
+    // or ensure we don't overlap if gridState is lost.
+    
     if ('absoluteBoundingBox' in node && node.absoluteBoundingBox) {
       const bbox = node.absoluteBoundingBox;
-      if (bbox && isFinite(bbox.x) && isFinite(bbox.y) && isFinite(bbox.width) && isFinite(bbox.height)) {
-        minX = Math.min(minX, bbox.x);
-        minY = Math.min(minY, bbox.y);
-        maxX = Math.max(maxX, bbox.x + bbox.width);
-        maxY = Math.max(maxY, bbox.y + bbox.height);
-        hasValidBounds = true;
-      }
+      minX = Math.min(minX, bbox.x);
+      maxX = Math.max(maxX, bbox.x + bbox.width);
+      maxY = Math.max(maxY, bbox.y + bbox.height);
+      hasContent = true;
+    } else if ('width' in node && 'height' in node && 'x' in node && 'y' in node) {
+        // Fallback for nodes that might not return absoluteBoundingBox (unlikely for top-level)
+        minX = Math.min(minX, node.x);
+        maxX = Math.max(maxX, node.x + node.width);
+        maxY = Math.max(maxY, node.y + node.height);
+        hasContent = true;
     }
-  });
+  }
   
-  // If we have existing grid state and it's below existing content, continue from there
-  if (gridState.count > 0 && gridState.startY > 0 && hasValidBounds) {
-    const gridBottom = gridState.startY + Math.max(...gridState.columns);
-    if (gridBottom > maxY) {
-      // Our grid is already below everything, continue from there
+  if (!hasContent) {
+      return { x: 0, y: 0 };
+  }
+
+  // If we have a stored grid state that is BELOW the current content, use it.
+  // This happens if we just added an image.
+  // But if the user moved things around, we might need to re-calculate.
+  
+  // Strategy:
+  // 1. If gridState.startY is already > maxY, we are safe.
+  // 2. If not, we need to move our start point.
+  
+  const currentGridBottom = gridState.startY + Math.max(...(gridState.columns || [0]));
+  
+  if (currentGridBottom > maxY) {
+      // Our current grid keeps us safe (we are the lowest thing)
       return { x: gridState.startX, y: gridState.startY };
-    }
   }
   
-  // Find safe starting position: below all existing content with padding
-  const SAFE_MARGIN = 50;
-  let startX = 100; // Default fallback
-  let startY = 100; // Default fallback
+  // Otherwise, start a new block below everything
+  const GAP_FROM_CONTENT = 100;
+  // Align left with content, or 0 if content is far right
+  const newX = (minX === Infinity) ? 0 : minX; 
+  const newY = maxY + GAP_FROM_CONTENT;
   
-  if (hasValidBounds && isFinite(minX) && isFinite(maxX) && isFinite(maxY)) {
-    startX = Math.max(100, minX);
-    startY = maxY + SAFE_MARGIN;
-  }
-  
-  // Final validation - ensure no NaN or Infinity
-  if (!isFinite(startX) || isNaN(startX)) startX = 100;
-  if (!isFinite(startY) || isNaN(startY)) startY = 100;
-  
-  return { x: startX, y: startY };
+  return { x: newX, y: newY };
 }
 
 // Find the column with the minimum height (for masonry layout)
 function findShortestColumn() {
+  if (!gridState.columns || gridState.columns.length === 0) {
+      gridState.columns = Array(GRID_COLUMNS).fill(0);
+  }
+
   let minHeight = gridState.columns[0];
   let columnIndex = 0;
   
@@ -140,123 +124,96 @@ figma.ui.onmessage = async (msg) => {
       
       const { bytes, width, height } = msg;
       
-      console.log('Creating image from bytes:', bytes.length, 'bytes');
+      console.log('Creating image from bytes:', bytes.length);
 
       if (!bytes || bytes.length === 0) {
         throw new Error('Image data is empty');
       }
 
-      // Validate bytes array
-      if (!Array.isArray(bytes)) {
-        throw new Error('Bytes must be an array');
-      }
-
-      // Create Image Paint - using Uint8Array as per Figma API
+      // Create Image Paint
       const uint8Array = new Uint8Array(bytes);
-      
-      // Log format for debugging but don't block
-      const firstBytes = Array.from(uint8Array.slice(0, 4));
-      console.log('Image first bytes:', firstBytes.map(b => '0x' + b.toString(16)).join(' '));
-      
       const image = figma.createImage(uint8Array);
       
-      // Create Rectangle node
+      // Create Rectangle
       const node = figma.createRectangle();
       
       // Use ORIGINAL dimensions - don't downscale for quality
-      // Only limit if it's extremely large (over 2000px) to avoid performance issues
       const MAX_DIMENSION = 2000;
       let finalWidth = width || 400;
       let finalHeight = height || 400;
       
-      // Validate dimensions (prevent NaN)
-      if (!isFinite(finalWidth) || isNaN(finalWidth) || finalWidth <= 0) finalWidth = 400;
-      if (!isFinite(finalHeight) || isNaN(finalHeight) || finalHeight <= 0) finalHeight = 400;
+      // Validate dimensions
+      if (!Number.isFinite(finalWidth) || finalWidth <= 0) finalWidth = 400;
+      if (!Number.isFinite(finalHeight) || finalHeight <= 0) finalHeight = 400;
       
-      // Maintain aspect ratio if we need to scale down
+      // Scale down if huge
       if (finalWidth > MAX_DIMENSION || finalHeight > MAX_DIMENSION) {
         const scale = Math.min(MAX_DIMENSION / finalWidth, MAX_DIMENSION / finalHeight);
         finalWidth = finalWidth * scale;
         finalHeight = finalHeight * scale;
       }
-      
-      // Final validation before resize
-      if (!isFinite(finalWidth) || isNaN(finalWidth)) finalWidth = 400;
-      if (!isFinite(finalHeight) || isNaN(finalHeight)) finalHeight = 400;
 
-      // Resize the node to original dimensions (or scaled if too large)
       node.resize(finalWidth, finalHeight);
       
-      // Set Fill with image - use FIT to preserve quality and aspect ratio
+      // Set Fill (FIT to preserve quality)
       node.fills = [{
         type: 'IMAGE',
-        scaleMode: 'FIT', // FIT preserves aspect ratio without cropping
+        scaleMode: 'FIT', 
         imageHash: image.hash
       }];
       
-      // Find safe starting position if this is the first image or grid was reset
-      if (gridState.count === 0) {
-        const emptyArea = findEmptyArea();
-        gridState.startX = emptyArea.x;
-        gridState.startY = emptyArea.y;
-        // Reset column heights when starting new grid
-        gridState.columns = Array(GRID_COLUMNS).fill(0);
+      // CHECK FOR EMPTY SPACE & GRID POSITION
+      // We re-evaluate position every time to ensure we don't overlap if user moved things
+      // But we want to maintain the "grid" structure for a session.
+      
+      // If this is the first image of a session OR we forced a reset, recalculate start.
+      // Actually, we should check if our current grid "pointer" is safe.
+      
+      const emptyPos = findEmptyArea();
+      
+      // If findEmptyArea returned a NEW Y that is significantly different from our gridState.startY,
+      // it means there was content in the way, so we should adopt this new start position
+      // and reset columns to 0 (start a new row/grid section).
+      
+      if (Math.abs(emptyPos.y - gridState.startY) > 1 && emptyPos.y > gridState.startY) {
+          // Content is blocking our old grid area. Move down and reset columns.
+          gridState.startX = emptyPos.x;
+          gridState.startY = emptyPos.y;
+          gridState.columns = Array(GRID_COLUMNS).fill(0);
+          console.log("Moved grid start to avoid overlap:", gridState.startY);
       }
       
-      // Calculate position in masonry grid
-      // Use actual image width for column spacing (images vary in size)
+      // Calculate specific X/Y for this image in the masonry
       const columnIndex = findShortestColumn();
-      // Estimate column width based on average (we'll use a fixed spacing for simplicity)
-      const ESTIMATED_COLUMN_WIDTH = 500; // Approximate, images will vary
+      const ESTIMATED_COLUMN_WIDTH = 500; // We don't restrict width, so we assume a "slot" width for spacing
+      
+      // Validated positions
       let x = gridState.startX + (columnIndex * (ESTIMATED_COLUMN_WIDTH + GRID_GAP));
       let y = gridState.startY + gridState.columns[columnIndex];
       
-      // Validate positions before setting (prevent NaN errors)
-      if (!isFinite(x) || isNaN(x)) x = 100 + (columnIndex * (ESTIMATED_COLUMN_WIDTH + GRID_GAP));
-      if (!isFinite(y) || isNaN(y)) y = 100 + (gridState.columns[columnIndex] || 0);
-      
-      // Ensure gridState values are valid
-      if (!isFinite(gridState.startX) || isNaN(gridState.startX)) gridState.startX = 100;
-      if (!isFinite(gridState.startY) || isNaN(gridState.startY)) gridState.startY = 100;
-      
-      // Set position
       node.x = x;
       node.y = y;
       
-      // Update column height
+      // Update column height for next image
       gridState.columns[columnIndex] += finalHeight + GRID_GAP;
       gridState.count++;
       
-      // Save updated state
       await saveGridState();
       
       // Add to page
       figma.currentPage.appendChild(node);
       
-      // Select and Zoom to it - using proper viewport API
+      // Select and Zoom
       figma.currentPage.selection = [node];
       figma.viewport.scrollAndZoomIntoView([node]);
       
-      figma.notify(`Image ${gridState.count} added to grid!`);
+      figma.notify(`Image added!`);
       
     } catch (err) {
       console.error('Figma Plugin Error:', err);
       figma.notify('Error: ' + err.message);
     }
   }
-  
-  // Reset grid command (optional - can be triggered from UI)
-  if (msg.type === 'reset-grid') {
-    gridState = {
-      columns: Array(GRID_COLUMNS).fill(0),
-      count: 0,
-      startX: 100,
-      startY: 100
-    };
-    await saveGridState();
-    figma.notify('Grid reset!');
-  }
 };
 
-// Load grid state on startup
 loadGridState();
