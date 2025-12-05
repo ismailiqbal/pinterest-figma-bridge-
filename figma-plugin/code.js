@@ -140,14 +140,35 @@ figma.ui.onmessage = async (msg) => {
       
       const { bytes, width, height } = msg;
       
-      console.log('Creating image from bytes:', bytes.length);
+      console.log('Creating image from bytes:', bytes.length, 'bytes');
 
       if (!bytes || bytes.length === 0) {
         throw new Error('Image data is empty');
       }
 
+      // Validate bytes array
+      if (!Array.isArray(bytes)) {
+        throw new Error('Bytes must be an array');
+      }
+
       // Create Image Paint - using Uint8Array as per Figma API
       const uint8Array = new Uint8Array(bytes);
+      
+      // Validate image format by checking magic bytes (first few bytes)
+      // PNG: 89 50 4E 47
+      // JPEG: FF D8 FF
+      // GIF: 47 49 46 38
+      const firstBytes = Array.from(uint8Array.slice(0, 4));
+      const isPNG = firstBytes[0] === 0x89 && firstBytes[1] === 0x50 && firstBytes[2] === 0x4E && firstBytes[3] === 0x47;
+      const isJPEG = firstBytes[0] === 0xFF && firstBytes[1] === 0xD8 && firstBytes[2] === 0xFF;
+      const isGIF = firstBytes[0] === 0x47 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46 && firstBytes[3] === 0x38;
+      
+      console.log('Image format check:', { isPNG, isJPEG, isGIF, firstBytes });
+      
+      if (!isPNG && !isJPEG && !isGIF) {
+        throw new Error(`Unsupported image format. First bytes: ${firstBytes.map(b => '0x' + b.toString(16)).join(' ')}. Figma supports PNG, JPEG, and GIF only.`);
+      }
+      
       const image = figma.createImage(uint8Array);
       
       // Create Rectangle node

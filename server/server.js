@@ -34,14 +34,48 @@ app.post('/send-image-http', async (req, res) => {
     }
     
     const imageBuffer = await imageResponse.arrayBuffer();
-    const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+    let contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
     
-    // Ensure we have a valid image type
+    // Check actual image format by magic bytes (first few bytes)
+    const buffer = Buffer.from(imageBuffer);
+    const firstBytes = buffer.slice(0, 4);
+    
+    // Detect format from magic bytes
+    let detectedFormat = contentType;
+    if (firstBytes[0] === 0x89 && firstBytes[1] === 0x50 && firstBytes[2] === 0x4E && firstBytes[3] === 0x47) {
+      detectedFormat = 'image/png';
+    } else if (firstBytes[0] === 0xFF && firstBytes[1] === 0xD8 && firstBytes[2] === 0xFF) {
+      detectedFormat = 'image/jpeg';
+    } else if (firstBytes[0] === 0x47 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46 && firstBytes[3] === 0x38) {
+      detectedFormat = 'image/gif';
+    } else if (firstBytes[0] === 0x52 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46 && firstBytes[3] === 0x46) {
+      // RIFF header - could be WebP
+      if (buffer.length > 8 && buffer.slice(8, 12).toString() === 'WEBP') {
+        detectedFormat = 'image/webp';
+        console.log('WARNING: WebP format detected. Figma does not support WebP. Converting to PNG...');
+        // WebP is not supported by Figma - we need to convert it
+        // For now, log the issue - user will need to install sharp or jimp for conversion
+        throw new Error('WebP format is not supported by Figma. Please use PNG or JPEG images.');
+      }
+    }
+    
+    // Use detected format if different from content-type
+    if (detectedFormat !== contentType) {
+      console.log(`Format mismatch: Content-Type says ${contentType}, but magic bytes indicate ${detectedFormat}`);
+      contentType = detectedFormat;
+    }
+    
+    // Ensure we have a valid image type that Figma supports
     if (!contentType.startsWith('image/')) {
       throw new Error('Invalid content type: ' + contentType);
     }
     
-    const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+    // Figma only supports PNG, JPEG, and GIF
+    if (contentType === 'image/webp') {
+      throw new Error('WebP format is not supported by Figma. Please use PNG or JPEG images.');
+    }
+    
+    const imageBase64 = buffer.toString('base64');
     const imageDataUrl = `data:${contentType};base64,${imageBase64}`;
     
     // Broadcast to the specific room with data URL instead of original URL
