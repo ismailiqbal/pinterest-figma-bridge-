@@ -3,7 +3,7 @@ figma.showUI(__html__, { width: 300, height: 200 });
 // Masonry Grid Configuration
 const GRID_COLUMNS = 3;
 const GRID_GAP = 20;
-const MAX_COLUMN_WIDTH = 400;
+// Note: We no longer limit column width - images keep original size for quality
 
 // Load grid state from storage
 let gridState = {
@@ -140,18 +140,26 @@ figma.ui.onmessage = async (msg) => {
       // Create Rectangle node
       const node = figma.createRectangle();
       
-      // Calculate dimensions (maintain aspect ratio, max width per column)
-      const ar = (width && height) ? width / height : 1;
-      const finalWidth = Math.min(width || 400, MAX_COLUMN_WIDTH);
-      const finalHeight = finalWidth / ar;
+      // Use ORIGINAL dimensions - don't downscale for quality
+      // Only limit if it's extremely large (over 2000px) to avoid performance issues
+      const MAX_DIMENSION = 2000;
+      let finalWidth = width || 400;
+      let finalHeight = height || 400;
+      
+      // Maintain aspect ratio if we need to scale down
+      if (finalWidth > MAX_DIMENSION || finalHeight > MAX_DIMENSION) {
+        const scale = Math.min(MAX_DIMENSION / finalWidth, MAX_DIMENSION / finalHeight);
+        finalWidth = finalWidth * scale;
+        finalHeight = finalHeight * scale;
+      }
 
-      // Resize the node
+      // Resize the node to original dimensions (or scaled if too large)
       node.resize(finalWidth, finalHeight);
       
-      // Set Fill with image - using proper Figma ImagePaint type
+      // Set Fill with image - use FIT to preserve quality and aspect ratio
       node.fills = [{
         type: 'IMAGE',
-        scaleMode: 'FILL',
+        scaleMode: 'FIT', // FIT preserves aspect ratio without cropping
         imageHash: image.hash
       }];
       
@@ -165,8 +173,11 @@ figma.ui.onmessage = async (msg) => {
       }
       
       // Calculate position in masonry grid
+      // Use actual image width for column spacing (images vary in size)
       const columnIndex = findShortestColumn();
-      const x = gridState.startX + (columnIndex * (MAX_COLUMN_WIDTH + GRID_GAP));
+      // Estimate column width based on average (we'll use a fixed spacing for simplicity)
+      const ESTIMATED_COLUMN_WIDTH = 500; // Approximate, images will vary
+      const x = gridState.startX + (columnIndex * (ESTIMATED_COLUMN_WIDTH + GRID_GAP));
       const y = gridState.startY + gridState.columns[columnIndex];
       
       // Set position

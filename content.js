@@ -123,12 +123,34 @@ function getHighestResImage(imgElement) {
         return { url: parts[0], width: 0 };
       });
       sources.sort((a, b) => b.width - a.width);
-      return sources[0]?.url || imgElement.src;
+      // Return the highest resolution image
+      if (sources.length > 0 && sources[0].url) {
+        return sources[0].url;
+      }
     }
+    
+    // Fallback: Try to get original/high-res version from current src
+    // Pinterest URLs often have size in path like /236x/ or /736x/ - try to get original
+    const currentSrc = imgElement.src;
+    if (currentSrc.includes('pinimg.com')) {
+      // Try to get original by removing size constraints
+      // Original format: https://i.pinimg.com/originals/...
+      // Or try: https://i.pinimg.com/564x/... (larger) or remove size entirely
+      const originalUrl = currentSrc.replace(/\/\d+x\/\d+\//, '/originals/')
+                                    .replace(/\/\d+x\//, '/originals/');
+      // If that doesn't work, try the largest common size (1200x or 564x)
+      if (!originalUrl.includes('originals')) {
+        // Try 1200x which is often the largest available
+        const largeUrl = currentSrc.replace(/\/\d+x\//, '/1200x/');
+        return largeUrl;
+      }
+      return originalUrl;
+    }
+    
+    return imgElement.src;
   } catch (e) {
     return imgElement.src;
   }
-  return imgElement.src;
 }
 
 // STARTUP LOGIC: Wait for Hydration
