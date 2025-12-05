@@ -70,33 +70,52 @@ async function tryFetchImage(url) {
     'Referer': 'https://www.pinterest.com/'
   };
 
-  // Try original URL first
+  // 1. Force upgrade to high-res if input is a low-res Pinterest URL
+  if (url.includes('pinimg.com') && url.match(/\/\d+x\//)) {
+    const candidates = [
+      url.replace(/\/\d+x\//, '/originals/'),
+      url.replace(/\/\d+x\//, '/1200x/'),
+      url.replace(/\/\d+x\//, '/736x/')
+    ];
+
+    for (const candidate of candidates) {
+      // Don't try if it's the same as input (unless input was already one of these formats)
+      if (candidate === url) continue;
+      
+      try {
+        console.log('Trying upgrade:', candidate.substring(0, 60));
+        const response = await fetch(candidate, { headers });
+        if (response.ok) {
+          console.log('Upgraded successfully to:', candidate.substring(0, 60));
+          return response;
+        }
+      } catch (e) {
+        // Ignore and try next
+      }
+    }
+  }
+
+  // 2. Fallback to the provided URL
   try {
     const response = await fetch(url, { headers });
     if (response.ok) return response;
   } catch (e) {
     console.log('Original URL failed:', e.message);
   }
-
-  // Try alternative formats for Pinterest images
+  
+  // 3. Last resort alternatives (if input was not low-res but still failed)
   if (url.includes('pinimg.com')) {
+    // ... existing alternative logic just in case ...
     const alternatives = [];
-    
     if (url.includes('/originals/')) {
       alternatives.push(url.replace('/originals/', '/1200x/'));
       alternatives.push(url.replace('/originals/', '/736x/'));
-    } else if (url.match(/\/\d+x\//)) {
-      alternatives.push(url.replace(/\/\d+x\//, '/originals/'));
-      alternatives.push(url.replace(/\/\d+x\//, '/1200x/'));
     }
     
     for (const altUrl of alternatives) {
       try {
         const response = await fetch(altUrl, { headers });
-        if (response.ok) {
-          console.log('Alternative URL worked:', altUrl.substring(0, 60));
-          return response;
-        }
+        if (response.ok) return response;
       } catch (e) {}
     }
   }
