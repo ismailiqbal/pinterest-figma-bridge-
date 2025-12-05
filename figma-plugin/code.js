@@ -42,6 +42,42 @@ figma.ui.onmessage = function(msg) {
     showBorder = msg.showBorder || false;
     borderWidth = msg.borderWidth || 2;
     borderColor = msg.borderColor || '#000000';
+    
+    // Update active grid if exists
+    if (gridId) {
+      var frame = figma.getNodeById(gridId);
+      if (frame && frame.type === 'FRAME') {
+        frame.itemSpacing = gap;
+        
+        // Update columns spacing
+        for (var i = 0; i < frame.children.length; i++) {
+          var child = frame.children[i];
+          if (child.type === 'FRAME') {
+            child.itemSpacing = gap;
+          }
+        }
+        
+        // Update border
+        if (showBorder) {
+          var rgb = hexToRgb(borderColor);
+          frame.strokes = [{ type: 'SOLID', color: rgb }];
+          frame.strokeWeight = borderWidth;
+        } else {
+          frame.strokes = [];
+        }
+        
+        // Update visual layout grid
+        frame.layoutGrids = [{
+          pattern: 'COLUMNS',
+          alignment: 'MIN',
+          gutterSize: gap,
+          sectionSize: columnWidth,
+          count: columns,
+          color: { r: 1, g: 0, b: 0, a: 0.1 }
+        }];
+      }
+    }
+    
     figma.notify('Settings updated');
   }
   
@@ -150,6 +186,16 @@ function getGrid() {
     col.resize(columnWidth, 100);
     frame.appendChild(col);
   }
+  
+  // Apply native Layout Grid (Visual)
+  frame.layoutGrids = [{
+    pattern: 'COLUMNS',
+    alignment: 'MIN',
+    gutterSize: gap,
+    sectionSize: columnWidth,
+    count: columns,
+    color: { r: 1, g: 0, b: 0, a: 0.1 }
+  }];
   
   // Position
   var y = 0;
