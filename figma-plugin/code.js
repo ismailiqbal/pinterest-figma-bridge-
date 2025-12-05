@@ -1,5 +1,5 @@
 // Pinterest to Figma - Plugin Code
-// Simple, flat architecture following Figma official docs
+// Using async/await instead of .then() for better compatibility
 
 // ============================================
 // CONFIGURATION
@@ -18,110 +18,119 @@ var DEFAULT_CONFIG = {
   borderColor: '#000000'
 };
 
-// Runtime state (not persisted)
+// Runtime state
 var config = null;
 var activeFrameId = null;
+
+// ============================================
+// MAIN ENTRY POINT
+// ============================================
+
+figma.showUI(__html__, { width: 320, height: 480 });
+
+figma.ui.onmessage = async function(msg) {
+  console.log('Plugin received:', msg.type);
+  
+  try {
+    if (msg.type === 'create-image') {
+      await handleCreateImage(msg.bytes, msg.width, msg.height);
+    }
+    else if (msg.type === 'get-config') {
+      await handleGetConfig();
+    }
+    else if (msg.type === 'update-config') {
+      await handleUpdateConfig(msg);
+    }
+    else if (msg.type === 'reset-session') {
+      await handleResetSession();
+    }
+  } catch (err) {
+    console.log('Error handling message:', err);
+    figma.notify('Error: ' + String(err));
+  }
+};
+
+figma.on('selectionchange', function() {
+  try {
+    handleSelectionChange();
+  } catch (err) {
+    console.log('Selection error:', err);
+  }
+});
+
+// Initialize
+initPlugin();
 
 // ============================================
 // INITIALIZATION
 // ============================================
 
-// Show UI immediately
-figma.showUI(__html__, { width: 320, height: 480 });
-
-// Set up message handler immediately (before any async operations)
-figma.ui.onmessage = handleMessage;
-
-// Set up selection handler
-figma.on('selectionchange', handleSelectionChange);
-
-// Load saved state
-loadState();
-
-// ============================================
-// MESSAGE HANDLING
-// ============================================
-
-function handleMessage(msg) {
-  console.log('Plugin received:', msg.type);
-  
-  if (msg.type === 'create-image') {
-    createImage(msg.bytes, msg.width, msg.height);
-  }
-  else if (msg.type === 'get-config') {
-    sendConfigToUI();
-  }
-  else if (msg.type === 'update-config') {
-    updateConfig(msg);
-  }
-  else if (msg.type === 'reset-session') {
-    resetSession();
-  }
-}
-
-// ============================================
-// STATE MANAGEMENT
-// ============================================
-
-function loadState() {
-  // Load config
-  figma.clientStorage.getAsync(STORAGE_CONFIG_KEY).then(function(saved) {
-    if (saved) {
-      config = {};
-      for (var key in DEFAULT_CONFIG) {
-        config[key] = saved[key] !== undefined ? saved[key] : DEFAULT_CONFIG[key];
-      }
+async function initPlugin() {
+  try {
+    // Load config
+    var savedConfig = await figma.clientStorage.getAsync(STORAGE_CONFIG_KEY);
+    if (savedConfig) {
+      config = {
+        columns: savedConfig.columns || DEFAULT_CONFIG.columns,
+        gap: savedConfig.gap || DEFAULT_CONFIG.gap,
+        columnWidth: savedConfig.columnWidth || DEFAULT_CONFIG.columnWidth,
+        showBorder: savedConfig.showBorder || DEFAULT_CONFIG.showBorder,
+        borderWidth: savedConfig.borderWidth || DEFAULT_CONFIG.borderWidth,
+        borderColor: savedConfig.borderColor || DEFAULT_CONFIG.borderColor
+      };
     } else {
-      config = {};
-      for (var key in DEFAULT_CONFIG) {
-        config[key] = DEFAULT_CONFIG[key];
-      }
+      config = {
+        columns: DEFAULT_CONFIG.columns,
+        gap: DEFAULT_CONFIG.gap,
+        columnWidth: DEFAULT_CONFIG.columnWidth,
+        showBorder: DEFAULT_CONFIG.showBorder,
+        borderWidth: DEFAULT_CONFIG.borderWidth,
+        borderColor: DEFAULT_CONFIG.borderColor
+      };
     }
-    sendConfigToUI();
-  }).catch(function(err) {
-    console.log('Error loading config:', err);
-    config = {};
-    for (var key in DEFAULT_CONFIG) {
-      config[key] = DEFAULT_CONFIG[key];
-    }
-    sendConfigToUI();
-  });
-  
-  // Load session
-  figma.clientStorage.getAsync(STORAGE_SESSION_KEY).then(function(saved) {
-    if (saved && saved.activeFrameId) {
-      // Verify the frame still exists
-      var node = figma.getNodeById(saved.activeFrameId);
-      if (node && node.type === 'FRAME' && !node.removed) {
+    
+    // Load session
+    var savedSession = await figma.clientStorage.getAsync(STORAGE_SESSION_KEY);
+    if (savedSession && savedSession.activeFrameId) {
+      var node = figma.getNodeById(savedSession.activeFrameId);
+      if (node && node.type === 'FRAME') {
         var pluginData = node.getPluginData(PLUGIN_DATA_KEY);
         if (pluginData === 'true') {
-          activeFrameId = saved.activeFrameId;
-          sendSessionStatus('Active');
+          activeFrameId = savedSession.activeFrameId;
         }
       }
     }
-  }).catch(function(err) {
-    console.log('Error loading session:', err);
-  });
+    
+    console.log('Pinterest Bridge: Initialized');
+  } catch (err) {
+    console.log('Init error:', err);
+    config = {
+      columns: DEFAULT_CONFIG.columns,
+      gap: DEFAULT_CONFIG.gap,
+      columnWidth: DEFAULT_CONFIG.columnWidth,
+      showBorder: DEFAULT_CONFIG.showBorder,
+      borderWidth: DEFAULT_CONFIG.borderWidth,
+      borderColor: DEFAULT_CONFIG.borderColor
+    };
+  }
+}
+
+// ============================================
+// MESSAGE HANDLERS
+// ============================================
+
+async function handleGetConfig() {
+  if (!config) {
+    config = {
+      columns: DEFAULT_CONFIG.columns,
+      gap: DEFAULT_CONFIG.gap,
+      columnWidth: DEFAULT_CONFIG.columnWidth,
+      showBorder: DEFAULT_CONFIG.showBorder,
+      borderWidth: DEFAULT_CONFIG.borderWidth,
+      borderColor: DEFAULT_CONFIG.borderColor
+    };
+  }
   
-  console.log('Pinterest Bridge: Initialized');
-}
-
-function saveConfig() {
-  figma.clientStorage.setAsync(STORAGE_CONFIG_KEY, config).catch(function(err) {
-    console.log('Error saving config:', err);
-  });
-}
-
-function saveSession() {
-  var data = { activeFrameId: activeFrameId };
-  figma.clientStorage.setAsync(STORAGE_SESSION_KEY, data).catch(function(err) {
-    console.log('Error saving session:', err);
-  });
-}
-
-function sendConfigToUI() {
-  if (!config) return;
   figma.ui.postMessage({
     type: 'config-loaded',
     columns: config.columns,
@@ -131,34 +140,33 @@ function sendConfigToUI() {
     borderWidth: config.borderWidth,
     borderColor: config.borderColor
   });
-}
-
-function sendSessionStatus(status) {
+  
+  // Send session status
+  var status = activeFrameId ? 'Active' : 'None';
   figma.ui.postMessage({
     type: 'session-status',
     status: status
   });
 }
 
-// ============================================
-// CONFIG UPDATES
-// ============================================
-
-function updateConfig(msg) {
-  config.columns = msg.columns || 3;
-  config.gap = msg.gap || 20;
-  config.showBorder = msg.showBorder || false;
-  config.borderWidth = msg.borderWidth || 2;
-  config.borderColor = msg.borderColor || '#000000';
+async function handleUpdateConfig(msg) {
+  config = {
+    columns: msg.columns || 3,
+    gap: msg.gap || 20,
+    columnWidth: config ? config.columnWidth : 300,
+    showBorder: msg.showBorder || false,
+    borderWidth: msg.borderWidth || 2,
+    borderColor: msg.borderColor || '#000000'
+  };
   
-  saveConfig();
+  await figma.clientStorage.setAsync(STORAGE_CONFIG_KEY, config);
   
   // Update active frame if exists
   if (activeFrameId) {
     var frame = figma.getNodeById(activeFrameId);
-    if (frame && frame.type === 'FRAME' && !frame.removed) {
+    if (frame && frame.type === 'FRAME') {
       frame.itemSpacing = config.gap;
-      updateFrameBorder(frame);
+      applyBorder(frame);
       
       // Update column gaps
       for (var i = 0; i < frame.children.length; i++) {
@@ -173,94 +181,54 @@ function updateConfig(msg) {
   figma.notify('Settings saved');
 }
 
-function resetSession() {
+async function handleResetSession() {
   activeFrameId = null;
-  saveSession();
-  sendSessionStatus('None');
+  await figma.clientStorage.setAsync(STORAGE_SESSION_KEY, { activeFrameId: null });
+  
+  figma.ui.postMessage({
+    type: 'session-status',
+    status: 'None'
+  });
+  
   figma.notify('Ready for new grid');
 }
 
-// ============================================
-// SELECTION HANDLING
-// ============================================
-
-function handleSelectionChange() {
-  var selection = figma.currentPage.selection;
-  
-  if (selection.length === 1) {
-    var node = selection[0];
-    if (node.type === 'FRAME' && !node.removed) {
-      var pluginData = node.getPluginData(PLUGIN_DATA_KEY);
-      if (pluginData === 'true') {
-        // User selected a Pinterest Grid - resume it
-        activeFrameId = node.id;
-        saveSession();
-        sendSessionStatus('Resumed');
-        return;
-      }
-    }
-  }
-  
-  // Check if current session is still valid
-  if (activeFrameId) {
-    var frame = figma.getNodeById(activeFrameId);
-    if (frame && !frame.removed) {
-      sendSessionStatus('Active');
-    } else {
-      activeFrameId = null;
-      sendSessionStatus('None');
-    }
-  } else {
-    sendSessionStatus('None');
-  }
-}
-
-// ============================================
-// IMAGE CREATION
-// ============================================
-
-function createImage(bytes, width, height) {
+async function handleCreateImage(bytes, width, height) {
   if (!bytes || bytes.length === 0) {
     figma.notify('Error: No image data');
     return;
   }
   
-  // Ensure config is loaded
+  // Ensure config
   if (!config) {
-    config = {};
-    for (var key in DEFAULT_CONFIG) {
-      config[key] = DEFAULT_CONFIG[key];
-    }
+    config = {
+      columns: DEFAULT_CONFIG.columns,
+      gap: DEFAULT_CONFIG.gap,
+      columnWidth: DEFAULT_CONFIG.columnWidth,
+      showBorder: DEFAULT_CONFIG.showBorder,
+      borderWidth: DEFAULT_CONFIG.borderWidth,
+      borderColor: DEFAULT_CONFIG.borderColor
+    };
   }
   
-  // Get or create grid frame
-  var gridFrame = getOrCreateGridFrame();
+  // Get or create grid
+  var gridFrame = getOrCreateGrid();
   if (!gridFrame) {
     figma.notify('Error: Could not create grid');
     return;
   }
   
-  // Create image
-  var imageData;
-  try {
-    var uint8Array = new Uint8Array(bytes);
-    imageData = figma.createImage(uint8Array);
-  } catch (err) {
-    figma.notify('Error creating image: ' + err.message);
-    return;
-  }
+  // Create image from bytes
+  var uint8 = new Uint8Array(bytes);
+  var imageData = figma.createImage(uint8);
   
-  // Calculate aspect ratio
-  var aspectRatio = 1;
-  if (width > 0 && height > 0) {
-    aspectRatio = height / width;
-  }
-  
-  // Create rectangle with image fill
-  var rect = figma.createRectangle();
+  // Calculate size
+  var aspectRatio = (height > 0 && width > 0) ? (height / width) : 1;
   var rectWidth = config.columnWidth;
   var rectHeight = Math.max(10, Math.round(rectWidth * aspectRatio));
   
+  // Create rectangle
+  var rect = figma.createRectangle();
   rect.resize(rectWidth, rectHeight);
   rect.fills = [{
     type: 'IMAGE',
@@ -268,61 +236,87 @@ function createImage(bytes, width, height) {
     imageHash: imageData.hash
   }];
   
-  // Find shortest column and add image
-  var shortestColumn = findShortestColumn(gridFrame);
-  if (shortestColumn) {
-    shortestColumn.appendChild(rect);
+  // Add to shortest column
+  var column = findShortestColumn(gridFrame);
+  if (column) {
+    column.appendChild(rect);
     rect.layoutAlign = 'STRETCH';
-    // Resize after appending to match column width
-    var newWidth = shortestColumn.width > 0 ? shortestColumn.width : config.columnWidth;
-    var newHeight = Math.max(10, Math.round(newWidth * aspectRatio));
-    rect.resize(newWidth, newHeight);
   } else {
-    // Fallback: add to grid frame directly
     gridFrame.appendChild(rect);
   }
   
-  // Update view
+  // Focus on new image
   figma.currentPage.selection = [rect];
   figma.viewport.scrollAndZoomIntoView([rect]);
   figma.notify('Image added');
 }
 
 // ============================================
-// GRID FRAME MANAGEMENT
+// SELECTION HANDLER
 // ============================================
 
-function getOrCreateGridFrame() {
-  // Check if we have an active valid frame
+function handleSelectionChange() {
+  var selection = figma.currentPage.selection;
+  
+  if (selection.length === 1) {
+    var node = selection[0];
+    if (node.type === 'FRAME') {
+      var pluginData = node.getPluginData(PLUGIN_DATA_KEY);
+      if (pluginData === 'true') {
+        activeFrameId = node.id;
+        figma.clientStorage.setAsync(STORAGE_SESSION_KEY, { activeFrameId: activeFrameId });
+        figma.ui.postMessage({ type: 'session-status', status: 'Resumed' });
+        return;
+      }
+    }
+  }
+  
+  // Check if current session valid
   if (activeFrameId) {
     var frame = figma.getNodeById(activeFrameId);
-    if (frame && frame.type === 'FRAME' && !frame.removed) {
+    if (frame) {
+      figma.ui.postMessage({ type: 'session-status', status: 'Active' });
+    } else {
+      activeFrameId = null;
+      figma.ui.postMessage({ type: 'session-status', status: 'None' });
+    }
+  } else {
+    figma.ui.postMessage({ type: 'session-status', status: 'None' });
+  }
+}
+
+// ============================================
+// GRID MANAGEMENT
+// ============================================
+
+function getOrCreateGrid() {
+  // Check active frame
+  if (activeFrameId) {
+    var frame = figma.getNodeById(activeFrameId);
+    if (frame && frame.type === 'FRAME') {
       return frame;
     }
   }
   
-  // Check if user has a grid frame selected
+  // Check selection
   var selection = figma.currentPage.selection;
   if (selection.length === 1 && selection[0].type === 'FRAME') {
-    var selectedFrame = selection[0];
-    var pluginData = selectedFrame.getPluginData(PLUGIN_DATA_KEY);
-    if (pluginData === 'true' && !selectedFrame.removed) {
-      activeFrameId = selectedFrame.id;
-      saveSession();
-      sendSessionStatus('Resumed');
-      return selectedFrame;
+    var sel = selection[0];
+    var pluginData = sel.getPluginData(PLUGIN_DATA_KEY);
+    if (pluginData === 'true') {
+      activeFrameId = sel.id;
+      figma.clientStorage.setAsync(STORAGE_SESSION_KEY, { activeFrameId: activeFrameId });
+      return sel;
     }
   }
   
-  // Create new grid frame
-  return createNewGridFrame();
+  // Create new grid
+  return createGrid();
 }
 
-function createNewGridFrame() {
+function createGrid() {
   var frame = figma.createFrame();
   frame.name = 'Pinterest Grid';
-  
-  // Set up horizontal auto-layout for columns
   frame.layoutMode = 'HORIZONTAL';
   frame.primaryAxisSizingMode = 'AUTO';
   frame.counterAxisSizingMode = 'AUTO';
@@ -333,82 +327,61 @@ function createNewGridFrame() {
   frame.paddingRight = 20;
   frame.fills = [];
   
-  // Mark as Pinterest Grid
   frame.setPluginData(PLUGIN_DATA_KEY, 'true');
-  
-  // Apply border if enabled
-  updateFrameBorder(frame);
+  applyBorder(frame);
   
   // Create columns
   for (var i = 0; i < config.columns; i++) {
-    var column = figma.createFrame();
-    column.name = 'Column ' + (i + 1);
-    
-    // Set up vertical auto-layout
-    column.layoutMode = 'VERTICAL';
-    column.primaryAxisSizingMode = 'AUTO';
-    column.counterAxisSizingMode = 'FIXED';
-    column.itemSpacing = config.gap;
-    column.fills = [];
-    column.resize(config.columnWidth, 100);
-    
-    frame.appendChild(column);
+    var col = figma.createFrame();
+    col.name = 'Column ' + (i + 1);
+    col.layoutMode = 'VERTICAL';
+    col.primaryAxisSizingMode = 'AUTO';
+    col.counterAxisSizingMode = 'FIXED';
+    col.itemSpacing = config.gap;
+    col.fills = [];
+    col.resize(config.columnWidth, 100);
+    frame.appendChild(col);
   }
   
-  // Position frame in empty area
-  var position = findEmptyPosition();
-  frame.x = position.x;
-  frame.y = position.y;
+  // Position below existing content
+  var pos = findEmptyPosition();
+  frame.x = pos.x;
+  frame.y = pos.y;
   
-  // Add to page
   figma.currentPage.appendChild(frame);
   
-  // Save reference
   activeFrameId = frame.id;
-  saveSession();
-  sendSessionStatus('Active');
+  figma.clientStorage.setAsync(STORAGE_SESSION_KEY, { activeFrameId: activeFrameId });
+  figma.ui.postMessage({ type: 'session-status', status: 'Active' });
   
   return frame;
 }
 
-function updateFrameBorder(frame) {
-  if (config.showBorder) {
-    var color = hexToRgb(config.borderColor);
-    frame.strokes = [{
-      type: 'SOLID',
-      color: color
-    }];
-    frame.strokeWeight = config.borderWidth;
-  } else {
-    frame.strokes = [];
-  }
-}
-
 function findShortestColumn(gridFrame) {
-  var shortestColumn = null;
-  var minHeight = Infinity;
+  var shortest = null;
+  var minH = Infinity;
   
   for (var i = 0; i < gridFrame.children.length; i++) {
     var child = gridFrame.children[i];
     if (child.type === 'FRAME') {
-      var height = child.height || 0;
-      if (height < minHeight) {
-        minHeight = height;
-        shortestColumn = child;
+      var h = child.height || 0;
+      if (h < minH) {
+        minH = h;
+        shortest = child;
       }
     }
   }
   
-  return shortestColumn;
+  return shortest;
 }
 
 function findEmptyPosition() {
-  var page = figma.currentPage;
   var maxY = 0;
   var minX = 100;
+  var children = figma.currentPage.children;
   
-  for (var i = 0; i < page.children.length; i++) {
-    var node = page.children[i];
+  for (var i = 0; i < children.length; i++) {
+    var node = children[i];
     if (node.y !== undefined && node.height !== undefined) {
       var bottom = node.y + node.height;
       if (bottom > maxY) {
@@ -420,15 +393,18 @@ function findEmptyPosition() {
     }
   }
   
-  return {
-    x: minX > 0 ? minX : 100,
-    y: maxY + 100
-  };
+  return { x: minX > 0 ? minX : 100, y: maxY + 100 };
 }
 
-// ============================================
-// UTILITIES
-// ============================================
+function applyBorder(frame) {
+  if (config.showBorder) {
+    var rgb = hexToRgb(config.borderColor);
+    frame.strokes = [{ type: 'SOLID', color: rgb }];
+    frame.strokeWeight = config.borderWidth;
+  } else {
+    frame.strokes = [];
+  }
+}
 
 function hexToRgb(hex) {
   var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
