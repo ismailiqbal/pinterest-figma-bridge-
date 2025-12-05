@@ -193,8 +193,16 @@ figma.ui.onmessage = async (msg) => {
       const columnIndex = findShortestColumn();
       // Estimate column width based on average (we'll use a fixed spacing for simplicity)
       const ESTIMATED_COLUMN_WIDTH = 500; // Approximate, images will vary
-      const x = gridState.startX + (columnIndex * (ESTIMATED_COLUMN_WIDTH + GRID_GAP));
-      const y = gridState.startY + gridState.columns[columnIndex];
+      let x = gridState.startX + (columnIndex * (ESTIMATED_COLUMN_WIDTH + GRID_GAP));
+      let y = gridState.startY + gridState.columns[columnIndex];
+      
+      // Validate positions before setting (prevent NaN errors)
+      if (!isFinite(x) || isNaN(x)) x = 100 + (columnIndex * (ESTIMATED_COLUMN_WIDTH + GRID_GAP));
+      if (!isFinite(y) || isNaN(y)) y = 100 + (gridState.columns[columnIndex] || 0);
+      
+      // Ensure gridState values are valid
+      if (!isFinite(gridState.startX) || isNaN(gridState.startX)) gridState.startX = 100;
+      if (!isFinite(gridState.startY) || isNaN(gridState.startY)) gridState.startY = 100;
       
       // Set position
       node.x = x;
