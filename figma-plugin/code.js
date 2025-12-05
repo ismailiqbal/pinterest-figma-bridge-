@@ -15,10 +15,10 @@ var borderColor = '#000000';
 var gridId = null;
 
 // Message handler
-figma.ui.onmessage = function(msg) {
+figma.ui.onmessage = async function(msg) {
   
   if (msg.type === 'create-image') {
-    createImage(msg.bytes, msg.width, msg.height);
+    await createImage(msg.bytes, msg.width, msg.height, msg.title, msg.originalUrl);
   }
   
   if (msg.type === 'get-config') {
@@ -42,42 +42,6 @@ figma.ui.onmessage = function(msg) {
     showBorder = msg.showBorder || false;
     borderWidth = msg.borderWidth || 2;
     borderColor = msg.borderColor || '#000000';
-    
-    // Update active grid if exists
-    if (gridId) {
-      var frame = figma.getNodeById(gridId);
-      if (frame && frame.type === 'FRAME') {
-        frame.itemSpacing = gap;
-        
-        // Update columns spacing
-        for (var i = 0; i < frame.children.length; i++) {
-          var child = frame.children[i];
-          if (child.type === 'FRAME') {
-            child.itemSpacing = gap;
-          }
-        }
-        
-        // Update border
-        if (showBorder) {
-          var rgb = hexToRgb(borderColor);
-          frame.strokes = [{ type: 'SOLID', color: rgb }];
-          frame.strokeWeight = borderWidth;
-        } else {
-          frame.strokes = [];
-        }
-        
-        // Update visual layout grid
-        frame.layoutGrids = [{
-          pattern: 'COLUMNS',
-          alignment: 'MIN',
-          gutterSize: gap,
-          sectionSize: columnWidth,
-          count: columns,
-          color: { r: 1, g: 0, b: 0, a: 0.1 }
-        }];
-      }
-    }
-    
     figma.notify('Settings updated');
   }
   
@@ -101,11 +65,15 @@ figma.on('selectionchange', function() {
 });
 
 // Create image function
-function createImage(bytes, w, h) {
+async function createImage(bytes, w, h, title, url) {
   if (!bytes || !bytes.length) {
     figma.notify('No image data');
     return;
   }
+  
+  // Load fonts first
+  await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+  await figma.loadFontAsync({ family: "Inter", style: "Bold" });
   
   // Get or create grid
   var grid = getGrid();
@@ -114,32 +82,76 @@ function createImage(bytes, w, h) {
   var uint8 = new Uint8Array(bytes);
   var img = figma.createImage(uint8);
   
-  // Calculate dimensions
+  // Calculate image dimensions
   var ratio = (h && w) ? (h / w) : 1;
-  var rectW = columnWidth;
-  var rectH = Math.round(rectW * ratio);
-  if (rectH < 10) rectH = 10;
+  var cardWidth = columnWidth;
+  var imgHeight = Math.round(cardWidth * ratio);
+  if (imgHeight < 10) imgHeight = 10;
   
-  // Create rectangle with image
-  var rect = figma.createRectangle();
-  rect.resize(rectW, rectH);
-  rect.fills = [{
+  // Create Card Frame
+  var card = figma.createFrame();
+  card.name = "Pin Card";
+  card.layoutMode = 'VERTICAL';
+  card.primaryAxisSizingMode = 'AUTO'; // Hug height
+  card.counterAxisSizingMode = 'FIXED'; // Fixed width
+  card.width = cardWidth;
+  card.itemSpacing = 8;
+  card.paddingTop = 0;
+  card.paddingLeft = 0;
+  card.paddingRight = 0;
+  card.paddingBottom = 12;
+  card.fills = []; // Transparent background
+  // Alternatively, for a "Card" look:
+  // card.fills = [{ type: 'SOLID', color: {r:1, g:1, b:1} }];
+  // card.cornerRadius = 8;
+  
+  // 1. Image Node
+  var imgRect = figma.createRectangle();
+  imgRect.resize(cardWidth, imgHeight);
+  imgRect.fills = [{
     type: 'IMAGE',
     scaleMode: 'FIT',
     imageHash: img.hash
   }];
+  imgRect.cornerRadius = 12; // Rounded image corners
+  card.appendChild(imgRect);
+  
+  // 2. Title Text
+  if (title) {
+    var titleText = figma.createText();
+    titleText.fontName = { family: "Inter", style: "Bold" };
+    titleText.characters = title;
+    titleText.fontSize = 12;
+    titleText.textAutoResize = 'HEIGHT';
+    titleText.layoutAlign = 'STRETCH'; // Fill width
+    card.appendChild(titleText);
+  }
+  
+  // 3. Link Text
+  if (url) {
+    var linkText = figma.createText();
+    linkText.fontName = { family: "Inter", style: "Regular" };
+    linkText.characters = "View on Pinterest ↗";
+    linkText.fontSize = 10;
+    linkText.fills = [{ type: 'SOLID', color: {r:0.5, g:0.5, b:0.5} }];
+    linkText.textDecoration = 'UNDERLINE';
+    linkText.hyperlink = { type: 'URL', value: url };
+    linkText.textAutoResize = 'HEIGHT';
+    linkText.layoutAlign = 'STRETCH';
+    card.appendChild(linkText);
+  }
   
   // Find shortest column
   var col = getShortestColumn(grid);
   if (col) {
-    col.appendChild(rect);
-    rect.layoutAlign = 'STRETCH';
+    col.appendChild(card);
+    card.layoutAlign = 'STRETCH';
   } else {
-    grid.appendChild(rect);
+    grid.appendChild(card);
   }
   
-  figma.currentPage.selection = [rect];
-  figma.viewport.scrollAndZoomIntoView([rect]);
+  figma.currentPage.selection = [card];
+  figma.viewport.scrollAndZoomIntoView([card]);
   figma.notify('Image added');
 }
 
@@ -187,16 +199,6 @@ function getGrid() {
     frame.appendChild(col);
   }
   
-  // Apply native Layout Grid (Visual)
-  frame.layoutGrids = [{
-    pattern: 'COLUMNS',
-    alignment: 'MIN',
-    gutterSize: gap,
-    sectionSize: columnWidth,
-    count: columns,
-    color: { r: 1, g: 0, b: 0, a: 0.1 }
-  }];
-  
   // Position
   var y = 0;
   var children = figma.currentPage.children;
@@ -243,4 +245,3 @@ function hexToRgb(hex) {
 }
 
 console.log('Pinterest Bridge: Ready');
-

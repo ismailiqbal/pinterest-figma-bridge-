@@ -49,7 +49,8 @@ async function handleSendToBridge(data) {
       roomId: figmaRoomId,
       url: data.url,
       width: data.width,
-      height: data.height
+      height: data.height,
+      title: data.title
     };
     
     console.log('Extension: POSTing to', `${BRIDGE_SERVER_URL}/send-image-http`, payload);

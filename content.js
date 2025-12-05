@@ -87,7 +87,8 @@ function processImages() {
              action: "sendToBridge",
              url: src,
              width: img.naturalWidth,
-             height: img.naturalHeight
+             height: img.naturalHeight,
+             title: img.alt || 'Pinterest Image'
            });
            
            if (response && response.success) {
