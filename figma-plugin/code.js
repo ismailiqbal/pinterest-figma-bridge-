@@ -3,14 +3,14 @@ figma.showUI(__html__, { width: 300, height: 200 });
 // Masonry Grid Configuration
 const GRID_COLUMNS = 3;
 const GRID_GAP = 20;
-const GRID_START_X = 100; // Starting X position
-const GRID_START_Y = 100; // Starting Y position
-const MAX_COLUMN_WIDTH = 400; // Max width per column
+const MAX_COLUMN_WIDTH = 400;
 
 // Load grid state from storage
 let gridState = {
   columns: Array(GRID_COLUMNS).fill(0), // Track height of each column
-  count: 0
+  count: 0,
+  startX: 100,
+  startY: 100
 };
 
 async function loadGridState() {
@@ -30,6 +30,60 @@ async function saveGridState() {
   } catch (e) {
     console.error('Failed to save grid state:', e);
   }
+}
+
+// Find empty area on the page
+function findEmptyArea() {
+  const page = figma.currentPage;
+  const allNodes = page.children;
+  
+  if (allNodes.length === 0) {
+    // Page is empty, start at top-left with margin
+    return { x: 100, y: 100 };
+  }
+  
+  // Calculate bounding box of all existing nodes
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  
+  allNodes.forEach(node => {
+    // Skip if it's one of our grid images (optional: check by name or metadata)
+    if (node.type === 'RECTANGLE' && node.fills && node.fills[0]?.type === 'IMAGE') {
+      // This might be one of our images, but we'll include it in bounds calculation
+    }
+    
+    const bounds = {
+      x: node.x,
+      y: node.y,
+      width: 'width' in node ? node.width : 0,
+      height: 'height' in node ? node.height : 0
+    };
+    
+    minX = Math.min(minX, bounds.x);
+    minY = Math.min(minY, bounds.y);
+    maxX = Math.max(maxX, bounds.x + bounds.width);
+    maxY = Math.max(maxY, bounds.y + bounds.height);
+  });
+  
+  // If we have existing grid state, check if we should continue from there
+  if (gridState.count > 0 && gridState.startY > 0) {
+    // Check if our grid area is below existing content
+    const gridBottom = gridState.startY + Math.max(...gridState.columns);
+    
+    if (gridBottom > maxY) {
+      // Our grid is already below everything, continue from there
+      return { x: gridState.startX, y: gridState.startY };
+    }
+  }
+  
+  // Find safe starting position: below all existing content with padding
+  const SAFE_MARGIN = 50;
+  const startX = Math.max(100, minX); // Start at left margin or align with existing content
+  const startY = maxY + SAFE_MARGIN; // Start below everything with margin
+  
+  return { x: startX, y: startY };
 }
 
 // Find the column with the minimum height (for masonry layout)
@@ -81,10 +135,19 @@ figma.ui.onmessage = async (msg) => {
         imageHash: image.hash
       }];
       
+      // Find safe starting position if this is the first image or grid was reset
+      if (gridState.count === 0) {
+        const emptyArea = findEmptyArea();
+        gridState.startX = emptyArea.x;
+        gridState.startY = emptyArea.y;
+        // Reset column heights when starting new grid
+        gridState.columns = Array(GRID_COLUMNS).fill(0);
+      }
+      
       // Calculate position in masonry grid
       const columnIndex = findShortestColumn();
-      const x = GRID_START_X + (columnIndex * (MAX_COLUMN_WIDTH + GRID_GAP));
-      const y = GRID_START_Y + gridState.columns[columnIndex];
+      const x = gridState.startX + (columnIndex * (MAX_COLUMN_WIDTH + GRID_GAP));
+      const y = gridState.startY + gridState.columns[columnIndex];
       
       node.x = x;
       node.y = y;
@@ -115,7 +178,9 @@ figma.ui.onmessage = async (msg) => {
   if (msg.type === 'reset-grid') {
     gridState = {
       columns: Array(GRID_COLUMNS).fill(0),
-      count: 0
+      count: 0,
+      startX: 100,
+      startY: 100
     };
     await saveGridState();
     figma.notify('Grid reset!');
