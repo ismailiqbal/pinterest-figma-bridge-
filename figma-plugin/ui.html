@@ -2,275 +2,309 @@
 <html>
 <head>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
     :root {
-      --bg: #FFFFFF;
-      --bg-hover: #F7F7F7;
-      --text: #1A1A1A;
-      --text-muted: #757575;
-      --border: #E0E0E0;
-      --primary: #FF4400; /* Zalando Orange-ish or keep blue? Sticking to a neutral dark/orange vibe matches Zalando better */
-      --primary-hover: #D63900;
-      --success: #008000;
-      --error: #D90000;
-      --radius: 4px; /* Zalando is sharper */
-      --radius-lg: 8px;
+      --bg: #050505;
+      --card-bg: #111111;
+      --card-hover: #1A1A1A;
+      --text: #FFFFFF;
+      --text-muted: #666666;
+      --primary: #3B82F6; /* Electric Blue */
+      --primary-glow: rgba(59, 130, 246, 0.4);
+      --accent: #10B981; /* Neon Green */
+      --border: #222222;
+      --radius: 12px;
+      --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     }
     
     body { 
-      font-family: 'Zalando Sans', 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif; 
-      padding: 24px; 
+      font-family: 'Zalando Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+      padding: 20px; 
       color: var(--text); 
       margin: 0; 
       background: var(--bg);
       -webkit-font-smoothing: antialiased;
+      overflow: hidden; /* Prevent scrollbars */
     }
 
     /* Typography */
     h2 { 
-      font-size: 16px; 
-      font-weight: 700; 
-      margin: 0 0 8px 0; 
-      color: var(--text);
-      letter-spacing: -0.02em;
-    }
-    
-    h3 { 
-      font-size: 12px; 
-      font-weight: 700; 
-      text-transform: uppercase; 
-      color: var(--text);
+      font-size: 13px; 
+      font-weight: 500; 
       letter-spacing: 0.05em;
-      margin: 32px 0 16px 0;
-      padding-bottom: 8px;
-      border-bottom: 2px solid var(--text);
-      display: inline-block;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin: 0 0 20px 0;
+      text-align: center;
     }
 
-    /* Cards */
-    .card {
-      background: var(--bg);
-      /* border: 1px solid var(--border); */
-      /* border-radius: var(--radius-lg); */
-      /* padding: 16px; */
-      margin-bottom: 16px;
-    }
-    
-    /* Code Display */
-    .code-container {
-      position: relative;
-      background: var(--bg-hover);
-      border-radius: var(--radius);
-      padding: 24px;
-      text-align: center;
-      cursor: pointer;
-      border: 1px solid var(--border);
-      transition: all 0.2s;
-    }
-    .code-container:hover {
-      border-color: var(--text);
-      background: #FFFFFF;
-    }
-    .code-container:active {
-      transform: scale(0.99);
-    }
-    
-    .code-val {
-      font-family: 'Inter', monospace;
-      font-size: 32px;
-      font-weight: 700;
-      color: var(--text);
-      letter-spacing: 4px;
-    }
-    
-    .code-label {
+    h3 {
       font-size: 11px;
-      color: var(--text-muted);
-      margin-top: 12px;
       font-weight: 600;
+      color: var(--text-muted);
+      margin: 24px 0 12px 4px;
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
 
-    /* Status Dot */
+    /* Code Box - Hero Element */
+    .code-container {
+      position: relative;
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      transition: var(--transition);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    
+    .code-container::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    }
+
+    .code-container:hover {
+      border-color: #333;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+    }
+    
+    .code-container:active {
+      transform: scale(0.98);
+    }
+    
+    .code-val {
+      font-family: 'Inter', monospace;
+      font-size: 36px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: 4px;
+      text-shadow: 0 0 20px rgba(255,255,255,0.1);
+    }
+    
+    .code-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 12px;
+      font-weight: 500;
+      opacity: 0.7;
+    }
+
+    /* Connection Status */
     .status-badge {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      margin-top: 16px;
-      font-size: 12px;
-      font-weight: 500;
+      padding: 6px 12px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      font-size: 11px;
       color: var(--text-muted);
+      margin-top: -12px; /* Pull up closer to code box */
+      margin-bottom: 20px;
+      position: relative;
+      z-index: 2;
     }
+    
     .dot { 
-      width: 8px; 
-      height: 8px; 
+      width: 6px; 
+      height: 6px; 
       border-radius: 50%; 
-      background: #ccc; 
-      transition: background 0.3s;
+      background: #444; 
+      transition: var(--transition);
     }
+    
     .dot.connected { 
-      background: var(--success); 
+      background: var(--accent); 
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
     }
 
-    /* Controls */
+    /* Controls Container */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
     .control-row { 
       display: flex; 
       align-items: center; 
       justify-content: space-between; 
-      margin-bottom: 20px; 
-      gap: 16px;
+      margin-bottom: 16px; 
+      height: 28px;
     }
     .control-row:last-child { margin-bottom: 0; }
     
-    .label { font-size: 14px; font-weight: 400; color: var(--text); flex: 1; }
+    .label { 
+      font-size: 13px; 
+      color: #CCC; 
+      flex: 1; 
+    }
+    
     .value { 
-      font-size: 14px; 
-      font-weight: 700; 
-      color: var(--text); 
+      font-size: 13px; 
+      font-weight: 500; 
+      color: var(--text-muted); 
       min-width: 32px; 
       text-align: right; 
       font-variant-numeric: tabular-nums;
     }
 
-    /* Custom Inputs */
+    /* Futuristic Range Slider */
     input[type="range"] {
       flex: 1;
+      margin: 0 16px;
       -webkit-appearance: none;
       height: 2px;
-      background: var(--border);
-      border-radius: 0;
+      background: #333;
+      border-radius: 2px;
       outline: none;
     }
+    
     input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 16px;
-      height: 16px;
+      width: 14px;
+      height: 14px;
       border-radius: 50%;
       background: var(--text);
-      border: none;
+      border: 2px solid var(--bg);
       cursor: pointer;
-      transition: transform 0.2s;
+      box-shadow: 0 0 10px rgba(255,255,255,0.2);
+      transition: var(--transition);
     }
+    
     input[type="range"]::-webkit-slider-thumb:hover {
       transform: scale(1.2);
+      box-shadow: 0 0 15px rgba(255,255,255,0.4);
     }
 
-    /* Switch */
+    /* Minimal Switch */
     .switch {
       position: relative;
       display: inline-block;
-      width: 40px;
-      height: 24px;
+      width: 36px;
+      height: 20px;
     }
     .switch input { opacity: 0; width: 0; height: 0; }
     .slider {
       position: absolute;
       cursor: pointer;
       top: 0; left: 0; right: 0; bottom: 0;
-      background-color: var(--border);
+      background-color: #333;
       transition: .3s;
-      border-radius: 24px;
+      border-radius: 20px;
     }
     .slider:before {
       position: absolute;
       content: "";
-      height: 18px;
-      width: 18px;
-      left: 3px;
-      bottom: 3px;
-      background-color: white;
+      height: 16px;
+      width: 16px;
+      left: 2px;
+      bottom: 2px;
+      background-color: #888;
       transition: .3s;
       border-radius: 50%;
     }
-    input:checked + .slider { background-color: var(--text); }
-    input:checked + .slider:before { transform: translateX(16px); }
+    input:checked + .slider { background-color: var(--primary); }
+    input:checked + .slider:before { 
+      transform: translateX(16px); 
+      background-color: white;
+    }
 
     /* Color Input */
     input[type="color"] {
       -webkit-appearance: none;
-      border: 1px solid var(--border);
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
+      border: 1px solid #333;
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
       padding: 0;
       overflow: hidden;
       cursor: pointer;
+      background: none;
     }
     input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
     input[type="color"]::-webkit-color-swatch { border: none; }
 
-    /* Primary Button */
+    /* Action Button */
     .btn-primary {
       width: 100%;
       background: var(--text);
-      color: white;
+      color: var(--bg);
       border: none;
-      padding: 16px;
+      padding: 14px;
       border-radius: var(--radius);
-      font-size: 14px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+      font-size: 13px;
+      font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s;
-      margin-top: 32px;
-    }
-    .btn-primary:hover {
-      background: #000;
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    .btn-primary:active {
-      transform: translateY(0);
-      box-shadow: none;
-    }
-
-    /* Session Status */
-    .session-info {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 16px;
-      background: var(--bg-hover);
-      border-radius: var(--radius);
+      transition: var(--transition);
       margin-top: 24px;
-    }
-    .status-dot {
-      width: 8px; 
-      height: 8px; 
-      border-radius: 50%; 
-      display: inline-block;
-      margin-right: 8px;
+      position: relative;
+      overflow: hidden;
     }
     
+    .btn-primary:hover {
+      background: #E0E0E0;
+      transform: translateY(-1px);
+      box-shadow: 0 0 20px rgba(255,255,255,0.15);
+    }
+    
+    .btn-primary:active {
+      transform: scale(0.98);
+    }
+
+    /* Settings Panel Animation */
     #borderSettings {
-      margin-top: 20px;
-      padding-top: 20px;
+      padding-top: 16px;
+      margin-top: 16px;
       border-top: 1px solid var(--border);
       display: none;
+      animation: slideDown 0.3s ease;
     }
+
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* Centering Wrapper */
+    .center-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
   </style>
 </head>
 <body>
 
+  <!-- Header -->
+  <h2>Pinterest Bridge</h2>
+
   <!-- Pairing Section -->
-  <div style="text-align: center; margin-bottom: 32px;">
-    <h2 style="margin-bottom: 24px;">PINTEREST BRIDGE</h2>
-    <div class="code-container" id="codeDisplay">
-      <div class="code-val" id="codeText">...</div>
-      <div class="code-label">Click to Copy Code</div>
-    </div>
-    
+  <div class="code-container" id="codeDisplay">
+    <div class="code-val" id="codeText">...</div>
+    <div class="code-label">CLICK TO COPY</div>
+  </div>
+  
+  <div class="center-col">
     <div class="status-badge">
       <span class="dot" id="statusDot"></span>
-      <span id="statusText">Connecting...</span>
+      <span id="statusText" style="margin-left: 6px">Connecting...</span>
     </div>
   </div>
 
   <!-- Config Section -->
-  <h3>Grid Settings</h3>
+  <h3>Grid System</h3>
   <div class="card">
     <div class="control-row">
       <span class="label">Columns</span>
@@ -294,27 +328,23 @@
 
     <div id="borderSettings">
       <div class="control-row">
-        <span class="label">Border Width</span>
+        <span class="label">Thickness</span>
         <input type="range" id="borderWRange" min="1" max="20" value="2">
         <span class="value" id="borderWVal">2</span>
       </div>
-      <div class="control-row" style="margin-top: 16px;">
-        <span class="label">Border Color</span>
-        <input type="color" id="borderColor" value="#000000">
+      <div class="control-row">
+        <span class="label">Color</span>
+        <input type="color" id="borderColor" value="#FFFFFF">
       </div>
-    </div>
-  </div>
-
-  <!-- Session Status -->
-  <div class="session-info">
-    <span class="label" style="font-weight:600; font-size:12px;">ACTIVE SESSION</span>
-    <div style="display:flex; align-items:center;">
-      <span id="sessionStatusDot" class="status-dot" style="background:#ddd;"></span>
-      <span id="sessionStatus" style="font-size:12px; font-weight:600;">None</span>
     </div>
   </div>
 
   <button class="btn-primary" id="newSessionBtn">Start New Session</button>
+  
+  <!-- Status Text Footer -->
+  <div class="center-col" style="margin-top: 16px;">
+    <span id="sessionStatus" style="font-size: 11px; color: var(--text-muted);">No Active Session</span>
+  </div>
 
   <script>
     var SERVER_URL = 'wss://pinterest-figma-bridge.onrender.com';
@@ -328,7 +358,6 @@
     var statusDot = document.getElementById('statusDot');
     var statusText = document.getElementById('statusText');
     var sessionStatus = document.getElementById('sessionStatus');
-    var sessionStatusDot = document.getElementById('sessionStatusDot');
     
     var colsRange = document.getElementById('colsRange');
     var colsVal = document.getElementById('colsVal');
@@ -353,20 +382,20 @@
       document.body.removeChild(ta);
       
       var original = codeText.textContent;
-      codeText.textContent = 'COPIED!';
-      codeDisplay.style.borderColor = 'var(--success)';
+      codeText.textContent = 'COPIED';
+      codeText.style.color = 'var(--accent)';
       
       setTimeout(function() { 
         codeText.textContent = ROOM_ID; 
-        codeDisplay.style.borderColor = 'var(--border)';
+        codeText.style.color = 'var(--text)';
       }, 1500);
     };
 
     // Settings update
     function updateSettings() {
       colsVal.textContent = colsRange.value;
-      gapVal.textContent = gapRange.value + 'px';
-      borderWVal.textContent = borderWRange.value + 'px';
+      gapVal.textContent = gapRange.value;
+      borderWVal.textContent = borderWRange.value;
       borderSettings.style.display = borderToggle.checked ? 'block' : 'none';
 
       parent.postMessage({ pluginMessage: { 
@@ -405,9 +434,8 @@
 
       if (msg.type === 'session-status') {
         var isActive = msg.status === 'Active' || msg.status === 'Resumed';
-        sessionStatus.textContent = isActive ? 'Active' : 'None';
-        sessionStatus.style.color = isActive ? 'var(--text)' : 'var(--text-muted)';
-        sessionStatusDot.style.background = isActive ? 'var(--success)' : '#ddd';
+        sessionStatus.textContent = isActive ? 'Session Active' : 'No Active Session';
+        sessionStatus.style.color = isActive ? 'var(--accent)' : 'var(--text-muted)';
       }
     };
 
@@ -422,7 +450,7 @@
       
       ws.onopen = function() {
         statusDot.className = 'dot connected';
-        statusText.textContent = 'Ready to pair';
+        statusText.textContent = 'Connected';
         ws.send(JSON.stringify({ type: 'join', roomId: ROOM_ID }));
       };
       
@@ -434,20 +462,16 @@
       };
       
       ws.onerror = function() {
-        statusText.textContent = 'Connection Error';
+        statusText.textContent = 'Error';
       };
       
       ws.onmessage = function(event) {
         try {
           var data = JSON.parse(event.data);
           
-          if (data.type === 'joined') {
-            console.log('Joined room:', data.roomId);
-          }
-          
           if (data.type === 'new-image') {
-            statusText.textContent = 'Receiving Image...';
-            statusText.style.color = 'var(--text)';
+            statusText.textContent = 'Receiving...';
+            statusText.style.color = 'var(--primary)';
             handleImage(data);
           }
         } catch (e) {
@@ -467,7 +491,6 @@
             bytes[i] = bin.charCodeAt(i);
           }
         } else {
-          statusText.textContent = 'Invalid URL';
           return;
         }
 
@@ -487,17 +510,16 @@
         
         setTimeout(function() { 
           statusText.textContent = 'Image Added'; 
-          statusText.style.color = 'var(--success)';
+          statusText.style.color = 'var(--accent)';
           
           setTimeout(function() {
-            statusText.textContent = 'Ready to pair';
+            statusText.textContent = 'Connected';
             statusText.style.color = 'var(--text-muted)';
           }, 2000);
         }, 500);
         
       } catch (e) {
         console.log('Image error:', e);
-        statusText.textContent = 'Error';
       }
     }
 
