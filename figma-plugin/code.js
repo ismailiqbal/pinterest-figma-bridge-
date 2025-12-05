@@ -1,419 +1,200 @@
-// Pinterest to Figma - Plugin Code
-// Using async/await instead of .then() for better compatibility
-
-// ============================================
-// CONFIGURATION
-// ============================================
-
-var PLUGIN_DATA_KEY = 'isPinterestGrid';
-var STORAGE_CONFIG_KEY = 'pinterestConfig';
-var STORAGE_SESSION_KEY = 'pinterestSession';
-
-var DEFAULT_CONFIG = {
-  columns: 3,
-  gap: 20,
-  columnWidth: 300,
-  showBorder: false,
-  borderWidth: 2,
-  borderColor: '#000000'
-};
-
-// Runtime state
-var config = null;
-var activeFrameId = null;
-
-// ============================================
-// MAIN ENTRY POINT
-// ============================================
+// Pinterest to Figma Plugin
+// Minimal implementation
 
 figma.showUI(__html__, { width: 320, height: 480 });
 
-figma.ui.onmessage = async function(msg) {
-  console.log('Plugin received:', msg.type);
+// Grid settings
+var columns = 3;
+var gap = 20;
+var columnWidth = 300;
+var showBorder = false;
+var borderWidth = 2;
+var borderColor = '#000000';
+
+// Current grid frame ID
+var gridId = null;
+
+// Message handler
+figma.ui.onmessage = function(msg) {
   
-  try {
-    if (msg.type === 'create-image') {
-      await handleCreateImage(msg.bytes, msg.width, msg.height);
-    }
-    else if (msg.type === 'get-config') {
-      await handleGetConfig();
-    }
-    else if (msg.type === 'update-config') {
-      await handleUpdateConfig(msg);
-    }
-    else if (msg.type === 'reset-session') {
-      await handleResetSession();
-    }
-  } catch (err) {
-    console.log('Error handling message:', err);
-    figma.notify('Error: ' + String(err));
+  if (msg.type === 'create-image') {
+    createImage(msg.bytes, msg.width, msg.height);
+  }
+  
+  if (msg.type === 'get-config') {
+    figma.ui.postMessage({
+      type: 'config-loaded',
+      columns: columns,
+      gap: gap,
+      showBorder: showBorder,
+      borderWidth: borderWidth,
+      borderColor: borderColor
+    });
+    figma.ui.postMessage({
+      type: 'session-status',
+      status: gridId ? 'Active' : 'None'
+    });
+  }
+  
+  if (msg.type === 'update-config') {
+    columns = msg.columns || 3;
+    gap = msg.gap || 20;
+    showBorder = msg.showBorder || false;
+    borderWidth = msg.borderWidth || 2;
+    borderColor = msg.borderColor || '#000000';
+    figma.notify('Settings updated');
+  }
+  
+  if (msg.type === 'reset-session') {
+    gridId = null;
+    figma.ui.postMessage({ type: 'session-status', status: 'None' });
+    figma.notify('Ready for new grid');
   }
 };
 
+// Selection change handler
 figma.on('selectionchange', function() {
-  try {
-    handleSelectionChange();
-  } catch (err) {
-    console.log('Selection error:', err);
+  var sel = figma.currentPage.selection;
+  if (sel.length === 1 && sel[0].type === 'FRAME') {
+    var data = sel[0].getPluginData('pinterest');
+    if (data === 'grid') {
+      gridId = sel[0].id;
+      figma.ui.postMessage({ type: 'session-status', status: 'Resumed' });
+    }
   }
 });
 
-// Initialize
-initPlugin();
-
-// ============================================
-// INITIALIZATION
-// ============================================
-
-async function initPlugin() {
-  try {
-    // Load config
-    var savedConfig = await figma.clientStorage.getAsync(STORAGE_CONFIG_KEY);
-    if (savedConfig) {
-      config = {
-        columns: savedConfig.columns || DEFAULT_CONFIG.columns,
-        gap: savedConfig.gap || DEFAULT_CONFIG.gap,
-        columnWidth: savedConfig.columnWidth || DEFAULT_CONFIG.columnWidth,
-        showBorder: savedConfig.showBorder || DEFAULT_CONFIG.showBorder,
-        borderWidth: savedConfig.borderWidth || DEFAULT_CONFIG.borderWidth,
-        borderColor: savedConfig.borderColor || DEFAULT_CONFIG.borderColor
-      };
-    } else {
-      config = {
-        columns: DEFAULT_CONFIG.columns,
-        gap: DEFAULT_CONFIG.gap,
-        columnWidth: DEFAULT_CONFIG.columnWidth,
-        showBorder: DEFAULT_CONFIG.showBorder,
-        borderWidth: DEFAULT_CONFIG.borderWidth,
-        borderColor: DEFAULT_CONFIG.borderColor
-      };
-    }
-    
-    // Load session
-    var savedSession = await figma.clientStorage.getAsync(STORAGE_SESSION_KEY);
-    if (savedSession && savedSession.activeFrameId) {
-      var node = figma.getNodeById(savedSession.activeFrameId);
-      if (node && node.type === 'FRAME') {
-        var pluginData = node.getPluginData(PLUGIN_DATA_KEY);
-        if (pluginData === 'true') {
-          activeFrameId = savedSession.activeFrameId;
-        }
-      }
-    }
-    
-    console.log('Pinterest Bridge: Initialized');
-  } catch (err) {
-    console.log('Init error:', err);
-    config = {
-      columns: DEFAULT_CONFIG.columns,
-      gap: DEFAULT_CONFIG.gap,
-      columnWidth: DEFAULT_CONFIG.columnWidth,
-      showBorder: DEFAULT_CONFIG.showBorder,
-      borderWidth: DEFAULT_CONFIG.borderWidth,
-      borderColor: DEFAULT_CONFIG.borderColor
-    };
-  }
-}
-
-// ============================================
-// MESSAGE HANDLERS
-// ============================================
-
-async function handleGetConfig() {
-  if (!config) {
-    config = {
-      columns: DEFAULT_CONFIG.columns,
-      gap: DEFAULT_CONFIG.gap,
-      columnWidth: DEFAULT_CONFIG.columnWidth,
-      showBorder: DEFAULT_CONFIG.showBorder,
-      borderWidth: DEFAULT_CONFIG.borderWidth,
-      borderColor: DEFAULT_CONFIG.borderColor
-    };
-  }
-  
-  figma.ui.postMessage({
-    type: 'config-loaded',
-    columns: config.columns,
-    gap: config.gap,
-    columnWidth: config.columnWidth,
-    showBorder: config.showBorder,
-    borderWidth: config.borderWidth,
-    borderColor: config.borderColor
-  });
-  
-  // Send session status
-  var status = activeFrameId ? 'Active' : 'None';
-  figma.ui.postMessage({
-    type: 'session-status',
-    status: status
-  });
-}
-
-async function handleUpdateConfig(msg) {
-  config = {
-    columns: msg.columns || 3,
-    gap: msg.gap || 20,
-    columnWidth: config ? config.columnWidth : 300,
-    showBorder: msg.showBorder || false,
-    borderWidth: msg.borderWidth || 2,
-    borderColor: msg.borderColor || '#000000'
-  };
-  
-  await figma.clientStorage.setAsync(STORAGE_CONFIG_KEY, config);
-  
-  // Update active frame if exists
-  if (activeFrameId) {
-    var frame = figma.getNodeById(activeFrameId);
-    if (frame && frame.type === 'FRAME') {
-      frame.itemSpacing = config.gap;
-      applyBorder(frame);
-      
-      // Update column gaps
-      for (var i = 0; i < frame.children.length; i++) {
-        var child = frame.children[i];
-        if (child.type === 'FRAME') {
-          child.itemSpacing = config.gap;
-        }
-      }
-    }
-  }
-  
-  figma.notify('Settings saved');
-}
-
-async function handleResetSession() {
-  activeFrameId = null;
-  await figma.clientStorage.setAsync(STORAGE_SESSION_KEY, { activeFrameId: null });
-  
-  figma.ui.postMessage({
-    type: 'session-status',
-    status: 'None'
-  });
-  
-  figma.notify('Ready for new grid');
-}
-
-async function handleCreateImage(bytes, width, height) {
-  if (!bytes || bytes.length === 0) {
-    figma.notify('Error: No image data');
+// Create image function
+function createImage(bytes, w, h) {
+  if (!bytes || !bytes.length) {
+    figma.notify('No image data');
     return;
-  }
-  
-  // Ensure config
-  if (!config) {
-    config = {
-      columns: DEFAULT_CONFIG.columns,
-      gap: DEFAULT_CONFIG.gap,
-      columnWidth: DEFAULT_CONFIG.columnWidth,
-      showBorder: DEFAULT_CONFIG.showBorder,
-      borderWidth: DEFAULT_CONFIG.borderWidth,
-      borderColor: DEFAULT_CONFIG.borderColor
-    };
   }
   
   // Get or create grid
-  var gridFrame = getOrCreateGrid();
-  if (!gridFrame) {
-    figma.notify('Error: Could not create grid');
-    return;
-  }
+  var grid = getGrid();
   
-  // Create image from bytes
+  // Create image
   var uint8 = new Uint8Array(bytes);
-  var imageData = figma.createImage(uint8);
+  var img = figma.createImage(uint8);
   
-  // Calculate size
-  var aspectRatio = (height > 0 && width > 0) ? (height / width) : 1;
-  var rectWidth = config.columnWidth;
-  var rectHeight = Math.max(10, Math.round(rectWidth * aspectRatio));
+  // Calculate dimensions
+  var ratio = (h && w) ? (h / w) : 1;
+  var rectW = columnWidth;
+  var rectH = Math.round(rectW * ratio);
+  if (rectH < 10) rectH = 10;
   
-  // Create rectangle
+  // Create rectangle with image
   var rect = figma.createRectangle();
-  rect.resize(rectWidth, rectHeight);
+  rect.resize(rectW, rectH);
   rect.fills = [{
     type: 'IMAGE',
     scaleMode: 'FIT',
-    imageHash: imageData.hash
+    imageHash: img.hash
   }];
   
-  // Add to shortest column
-  var column = findShortestColumn(gridFrame);
-  if (column) {
-    column.appendChild(rect);
+  // Find shortest column
+  var col = getShortestColumn(grid);
+  if (col) {
+    col.appendChild(rect);
     rect.layoutAlign = 'STRETCH';
   } else {
-    gridFrame.appendChild(rect);
+    grid.appendChild(rect);
   }
   
-  // Focus on new image
   figma.currentPage.selection = [rect];
   figma.viewport.scrollAndZoomIntoView([rect]);
   figma.notify('Image added');
 }
 
-// ============================================
-// SELECTION HANDLER
-// ============================================
-
-function handleSelectionChange() {
-  var selection = figma.currentPage.selection;
-  
-  if (selection.length === 1) {
-    var node = selection[0];
-    if (node.type === 'FRAME') {
-      var pluginData = node.getPluginData(PLUGIN_DATA_KEY);
-      if (pluginData === 'true') {
-        activeFrameId = node.id;
-        figma.clientStorage.setAsync(STORAGE_SESSION_KEY, { activeFrameId: activeFrameId });
-        figma.ui.postMessage({ type: 'session-status', status: 'Resumed' });
-        return;
-      }
-    }
-  }
-  
-  // Check if current session valid
-  if (activeFrameId) {
-    var frame = figma.getNodeById(activeFrameId);
-    if (frame) {
-      figma.ui.postMessage({ type: 'session-status', status: 'Active' });
-    } else {
-      activeFrameId = null;
-      figma.ui.postMessage({ type: 'session-status', status: 'None' });
-    }
-  } else {
-    figma.ui.postMessage({ type: 'session-status', status: 'None' });
-  }
-}
-
-// ============================================
-// GRID MANAGEMENT
-// ============================================
-
-function getOrCreateGrid() {
-  // Check active frame
-  if (activeFrameId) {
-    var frame = figma.getNodeById(activeFrameId);
-    if (frame && frame.type === 'FRAME') {
-      return frame;
-    }
-  }
-  
-  // Check selection
-  var selection = figma.currentPage.selection;
-  if (selection.length === 1 && selection[0].type === 'FRAME') {
-    var sel = selection[0];
-    var pluginData = sel.getPluginData(PLUGIN_DATA_KEY);
-    if (pluginData === 'true') {
-      activeFrameId = sel.id;
-      figma.clientStorage.setAsync(STORAGE_SESSION_KEY, { activeFrameId: activeFrameId });
-      return sel;
+// Get or create grid
+function getGrid() {
+  // Try existing grid
+  if (gridId) {
+    var node = figma.getNodeById(gridId);
+    if (node && node.type === 'FRAME') {
+      return node;
     }
   }
   
   // Create new grid
-  return createGrid();
-}
-
-function createGrid() {
   var frame = figma.createFrame();
   frame.name = 'Pinterest Grid';
   frame.layoutMode = 'HORIZONTAL';
   frame.primaryAxisSizingMode = 'AUTO';
   frame.counterAxisSizingMode = 'AUTO';
-  frame.itemSpacing = config.gap;
+  frame.itemSpacing = gap;
   frame.paddingTop = 20;
   frame.paddingBottom = 20;
   frame.paddingLeft = 20;
   frame.paddingRight = 20;
   frame.fills = [];
+  frame.setPluginData('pinterest', 'grid');
   
-  frame.setPluginData(PLUGIN_DATA_KEY, 'true');
-  applyBorder(frame);
+  // Border
+  if (showBorder) {
+    var rgb = hexToRgb(borderColor);
+    frame.strokes = [{ type: 'SOLID', color: rgb }];
+    frame.strokeWeight = borderWidth;
+  }
   
   // Create columns
-  for (var i = 0; i < config.columns; i++) {
+  for (var i = 0; i < columns; i++) {
     var col = figma.createFrame();
-    col.name = 'Column ' + (i + 1);
+    col.name = 'Col ' + (i + 1);
     col.layoutMode = 'VERTICAL';
     col.primaryAxisSizingMode = 'AUTO';
     col.counterAxisSizingMode = 'FIXED';
-    col.itemSpacing = config.gap;
+    col.itemSpacing = gap;
     col.fills = [];
-    col.resize(config.columnWidth, 100);
+    col.resize(columnWidth, 100);
     frame.appendChild(col);
   }
   
-  // Position below existing content
-  var pos = findEmptyPosition();
-  frame.x = pos.x;
-  frame.y = pos.y;
+  // Position
+  var y = 0;
+  var children = figma.currentPage.children;
+  for (var j = 0; j < children.length; j++) {
+    var c = children[j];
+    if (c.y !== undefined && c.height !== undefined) {
+      var bottom = c.y + c.height;
+      if (bottom > y) y = bottom;
+    }
+  }
+  frame.x = 100;
+  frame.y = y + 100;
   
   figma.currentPage.appendChild(frame);
+  gridId = frame.id;
   
-  activeFrameId = frame.id;
-  figma.clientStorage.setAsync(STORAGE_SESSION_KEY, { activeFrameId: activeFrameId });
   figma.ui.postMessage({ type: 'session-status', status: 'Active' });
   
   return frame;
 }
 
-function findShortestColumn(gridFrame) {
+// Find shortest column
+function getShortestColumn(grid) {
   var shortest = null;
-  var minH = Infinity;
+  var minH = 999999;
   
-  for (var i = 0; i < gridFrame.children.length; i++) {
-    var child = gridFrame.children[i];
-    if (child.type === 'FRAME') {
-      var h = child.height || 0;
-      if (h < minH) {
-        minH = h;
-        shortest = child;
-      }
+  for (var i = 0; i < grid.children.length; i++) {
+    var child = grid.children[i];
+    if (child.type === 'FRAME' && child.height < minH) {
+      minH = child.height;
+      shortest = child;
     }
   }
   
   return shortest;
 }
 
-function findEmptyPosition() {
-  var maxY = 0;
-  var minX = 100;
-  var children = figma.currentPage.children;
-  
-  for (var i = 0; i < children.length; i++) {
-    var node = children[i];
-    if (node.y !== undefined && node.height !== undefined) {
-      var bottom = node.y + node.height;
-      if (bottom > maxY) {
-        maxY = bottom;
-        if (node.x !== undefined) {
-          minX = node.x;
-        }
-      }
-    }
-  }
-  
-  return { x: minX > 0 ? minX : 100, y: maxY + 100 };
-}
-
-function applyBorder(frame) {
-  if (config.showBorder) {
-    var rgb = hexToRgb(config.borderColor);
-    frame.strokes = [{ type: 'SOLID', color: rgb }];
-    frame.strokeWeight = config.borderWidth;
-  } else {
-    frame.strokes = [];
-  }
-}
-
+// Hex to RGB
 function hexToRgb(hex) {
-  var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (result) {
-    return {
-      r: parseInt(result[1], 16) / 255,
-      g: parseInt(result[2], 16) / 255,
-      b: parseInt(result[3], 16) / 255
-    };
-  }
-  return { r: 0, g: 0, b: 0 };
+  var r = parseInt(hex.slice(1, 3), 16) / 255;
+  var g = parseInt(hex.slice(3, 5), 16) / 255;
+  var b = parseInt(hex.slice(5, 7), 16) / 255;
+  return { r: r, g: g, b: b };
 }
+
+console.log('Pinterest Bridge: Ready');
+
