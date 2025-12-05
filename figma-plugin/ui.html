@@ -111,19 +111,33 @@
           
           // Check if it's a data URL (base64) or regular URL
           if (data.url.startsWith('data:')) {
-            // Data URL - decode base64 directly
-            const base64Data = data.url.split(',')[1];
+            // Data URL - decode base64 correctly
+            const parts = data.url.split(',');
+            if (parts.length < 2) {
+              throw new Error('Invalid data URL format');
+            }
+            const base64Data = parts[1];
+            // Decode base64 to binary string
             const binaryString = atob(base64Data);
+            // Convert binary string to Uint8Array
             bytes = new Uint8Array(binaryString.length);
             for (let i = 0; i < binaryString.length; i++) {
               bytes[i] = binaryString.charCodeAt(i);
             }
           } else {
-            // Regular URL - fetch it
+            // Regular URL - fetch it (shouldn't happen with our setup, but keep as fallback)
             const response = await fetch(data.url);
+            if (!response.ok) {
+              throw new Error('Failed to fetch image: ' + response.status);
+            }
             const blob = await response.blob();
             const buffer = await blob.arrayBuffer();
             bytes = new Uint8Array(buffer);
+          }
+          
+          // Validate bytes
+          if (!bytes || bytes.length === 0) {
+            throw new Error('Image data is empty after decoding');
           }
           
           // Convert Uint8Array to regular Array for postMessage serialization

@@ -29,9 +29,20 @@ app.post('/send-image-http', async (req, res) => {
   // Fetch the image and convert to base64 to avoid CORS issues
   try {
     const imageResponse = await fetch(url);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+    }
+    
     const imageBuffer = await imageResponse.arrayBuffer();
+    const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+    
+    // Ensure we have a valid image type
+    if (!contentType.startsWith('image/')) {
+      throw new Error('Invalid content type: ' + contentType);
+    }
+    
     const imageBase64 = Buffer.from(imageBuffer).toString('base64');
-    const imageDataUrl = `data:${imageResponse.headers.get('content-type') || 'image/jpeg'};base64,${imageBase64}`;
+    const imageDataUrl = `data:${contentType};base64,${imageBase64}`;
     
     // Broadcast to the specific room with data URL instead of original URL
     io.to(roomId).emit('new-image', { 
