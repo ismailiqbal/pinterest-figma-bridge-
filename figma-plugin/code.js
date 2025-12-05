@@ -3,7 +3,6 @@ figma.showUI(__html__, { width: 300, height: 200 });
 // Masonry Grid Configuration
 const GRID_COLUMNS = 3;
 const GRID_GAP = 20;
-// Note: We no longer limit column width - images keep original size for quality
 
 // Load grid state from storage
 let gridState = {
@@ -32,29 +31,38 @@ async function saveGridState() {
   }
 }
 
-// Recursively get all nodes including nested ones (frames, groups, etc.)
-function getAllNodes(node) {
-  const nodes = [];
+// Get all nodes on the page using Figma's findAll API (more reliable)
+function getAllPageNodes() {
+  const page = figma.currentPage;
+  const allNodes = [];
   
-  // Add current node if it's not a page
-  if (node.type !== 'PAGE') {
-    nodes.push(node);
-  }
-  
-  // Recursively get children
-  if ('children' in node) {
-    for (const child of node.children) {
-      nodes.push(...getAllNodes(child));
+  // Use findAll to get ALL nodes recursively (handles frames, groups, etc.)
+  // This is the recommended way per Figma API
+  try {
+    // Find all nodes except the page itself
+    const nodes = page.findAll();
+    // Filter out the page node itself
+    return nodes.filter(node => node.type !== 'PAGE');
+  } catch (e) {
+    // Fallback: manual recursion
+    function traverse(node) {
+      if (node.type !== 'PAGE') {
+        allNodes.push(node);
+      }
+      if ('children' in node) {
+        for (const child of node.children) {
+          traverse(child);
+        }
+      }
     }
+    traverse(page);
+    return allNodes;
   }
-  
-  return nodes;
 }
 
 // Find empty area on the page using absoluteBoundingBox for accurate bounds
 function findEmptyArea() {
-  const page = figma.currentPage;
-  const allNodes = getAllNodes(page);
+  const allNodes = getAllPageNodes();
   
   if (allNodes.length === 0) {
     // Page is empty, start at top-left with margin
@@ -62,35 +70,31 @@ function findEmptyArea() {
   }
   
   // Calculate bounding box of all existing nodes using absoluteBoundingBox
+  // absoluteBoundingBox gives page-relative coordinates (handles frames, groups, etc.)
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
   let maxY = -Infinity;
+  let hasValidBounds = false;
   
   allNodes.forEach(node => {
-    // Use absoluteBoundingBox for accurate bounds (handles transforms, frames, etc.)
+    // Use absoluteBoundingBox - this is the correct way per Figma API
+    // It gives page coordinates even for nodes inside frames
     if ('absoluteBoundingBox' in node && node.absoluteBoundingBox) {
       const bbox = node.absoluteBoundingBox;
-      minX = Math.min(minX, bbox.x);
-      minY = Math.min(minY, bbox.y);
-      maxX = Math.max(maxX, bbox.x + bbox.width);
-      maxY = Math.max(maxY, bbox.y + bbox.height);
-    } else if ('x' in node && 'y' in node) {
-      // Fallback for nodes without absoluteBoundingBox
-      const width = 'width' in node ? node.width : 0;
-      const height = 'height' in node ? node.height : 0;
-      minX = Math.min(minX, node.x);
-      minY = Math.min(minY, node.y);
-      maxX = Math.max(maxX, node.x + width);
-      maxY = Math.max(maxY, node.y + height);
+      if (bbox && isFinite(bbox.x) && isFinite(bbox.y) && isFinite(bbox.width) && isFinite(bbox.height)) {
+        minX = Math.min(minX, bbox.x);
+        minY = Math.min(minY, bbox.y);
+        maxX = Math.max(maxX, bbox.x + bbox.width);
+        maxY = Math.max(maxY, bbox.y + bbox.height);
+        hasValidBounds = true;
+      }
     }
   });
   
-  // If we have existing grid state, check if we should continue from there
-  if (gridState.count > 0 && gridState.startY > 0) {
-    // Check if our grid area is below existing content
+  // If we have existing grid state and it's below existing content, continue from there
+  if (gridState.count > 0 && gridState.startY > 0 && hasValidBounds) {
     const gridBottom = gridState.startY + Math.max(...gridState.columns);
-    
     if (gridBottom > maxY) {
       // Our grid is already below everything, continue from there
       return { x: gridState.startX, y: gridState.startY };
@@ -99,22 +103,15 @@ function findEmptyArea() {
   
   // Find safe starting position: below all existing content with padding
   const SAFE_MARGIN = 50;
-  
-  // Validate and ensure we have valid numbers (handle Infinity/NaN cases)
   let startX = 100; // Default fallback
   let startY = 100; // Default fallback
   
-  if (isFinite(minX) && isFinite(maxX)) {
+  if (hasValidBounds && isFinite(minX) && isFinite(maxX) && isFinite(maxY)) {
     startX = Math.max(100, minX);
-  }
-  
-  if (isFinite(maxY)) {
     startY = maxY + SAFE_MARGIN;
-  } else if (isFinite(minY)) {
-    startY = minY + SAFE_MARGIN;
   }
   
-  // Final validation - ensure no NaN
+  // Final validation - ensure no NaN or Infinity
   if (!isFinite(startX) || isNaN(startX)) startX = 100;
   if (!isFinite(startY) || isNaN(startY)) startY = 100;
   
