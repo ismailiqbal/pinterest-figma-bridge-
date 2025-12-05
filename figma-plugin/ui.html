@@ -2,25 +2,25 @@
 <html>
 <head>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
     :root {
       --bg: #FFFFFF;
-      --bg-hover: #F5F5F5;
-      --text: #333333;
-      --text-muted: #888888;
-      --border: #E6E6E6;
-      --primary: #18A0FB; /* Figma Blue */
-      --primary-hover: #0D8CE0;
-      --success: #1BC47D;
-      --error: #F24822;
-      --radius: 8px;
-      --radius-lg: 12px;
+      --bg-hover: #F7F7F7;
+      --text: #1A1A1A;
+      --text-muted: #757575;
+      --border: #E0E0E0;
+      --primary: #FF4400; /* Zalando Orange-ish or keep blue? Sticking to a neutral dark/orange vibe matches Zalando better */
+      --primary-hover: #D63900;
+      --success: #008000;
+      --error: #D90000;
+      --radius: 4px; /* Zalando is sharper */
+      --radius-lg: 8px;
     }
     
     body { 
-      font-family: 'Inter', sans-serif; 
-      padding: 20px; 
+      font-family: 'Zalando Sans', 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif; 
+      padding: 24px; 
       color: var(--text); 
       margin: 0; 
       background: var(--bg);
@@ -29,30 +29,32 @@
 
     /* Typography */
     h2 { 
-      font-size: 14px; 
-      font-weight: 600; 
-      margin: 0 0 16px 0; 
+      font-size: 16px; 
+      font-weight: 700; 
+      margin: 0 0 8px 0; 
       color: var(--text);
-      letter-spacing: -0.01em;
+      letter-spacing: -0.02em;
     }
     
     h3 { 
-      font-size: 11px; 
-      font-weight: 600; 
+      font-size: 12px; 
+      font-weight: 700; 
       text-transform: uppercase; 
-      color: var(--text-muted);
+      color: var(--text);
       letter-spacing: 0.05em;
-      margin: 24px 0 12px 0;
+      margin: 32px 0 16px 0;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--text);
+      display: inline-block;
     }
 
     /* Cards */
     .card {
       background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 16px;
+      /* border: 1px solid var(--border); */
+      /* border-radius: var(--radius-lg); */
+      /* padding: 16px; */
       margin-bottom: 16px;
-      transition: border-color 0.2s;
     }
     
     /* Code Display */
@@ -60,58 +62,56 @@
       position: relative;
       background: var(--bg-hover);
       border-radius: var(--radius);
-      padding: 20px;
+      padding: 24px;
       text-align: center;
       cursor: pointer;
-      border: 1px solid transparent;
+      border: 1px solid var(--border);
       transition: all 0.2s;
     }
     .code-container:hover {
-      border-color: var(--border);
-      background: #F0F0F0;
+      border-color: var(--text);
+      background: #FFFFFF;
     }
     .code-container:active {
       transform: scale(0.99);
     }
     
     .code-val {
-      font-family: 'SF Mono', 'Roboto Mono', monospace;
-      font-size: 24px;
-      font-weight: 600;
+      font-family: 'Inter', monospace;
+      font-size: 32px;
+      font-weight: 700;
       color: var(--text);
-      letter-spacing: 2px;
+      letter-spacing: 4px;
     }
     
     .code-label {
-      font-size: 10px;
+      font-size: 11px;
       color: var(--text-muted);
-      margin-top: 8px;
-      font-weight: 500;
+      margin-top: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
 
     /* Status Dot */
     .status-badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 4px 8px;
-      background: #F5F5F5;
-      border-radius: 100px;
-      font-size: 10px;
+      gap: 8px;
+      margin-top: 16px;
+      font-size: 12px;
       font-weight: 500;
       color: var(--text-muted);
-      margin-top: 12px;
     }
     .dot { 
-      width: 6px; 
-      height: 6px; 
+      width: 8px; 
+      height: 8px; 
       border-radius: 50%; 
       background: #ccc; 
       transition: background 0.3s;
     }
     .dot.connected { 
       background: var(--success); 
-      box-shadow: 0 0 0 2px rgba(27, 196, 125, 0.2);
     }
 
     /* Controls */
@@ -119,17 +119,17 @@
       display: flex; 
       align-items: center; 
       justify-content: space-between; 
-      margin-bottom: 16px; 
-      gap: 12px;
+      margin-bottom: 20px; 
+      gap: 16px;
     }
     .control-row:last-child { margin-bottom: 0; }
     
-    .label { font-size: 12px; font-weight: 500; color: var(--text); flex: 1; }
+    .label { font-size: 14px; font-weight: 400; color: var(--text); flex: 1; }
     .value { 
-      font-size: 12px; 
-      font-weight: 600; 
-      color: var(--text-muted); 
-      min-width: 24px; 
+      font-size: 14px; 
+      font-weight: 700; 
+      color: var(--text); 
+      min-width: 32px; 
       text-align: right; 
       font-variant-numeric: tabular-nums;
     }
@@ -138,9 +138,9 @@
     input[type="range"] {
       flex: 1;
       -webkit-appearance: none;
-      height: 4px;
+      height: 2px;
       background: var(--border);
-      border-radius: 2px;
+      border-radius: 0;
       outline: none;
     }
     input[type="range"]::-webkit-slider-thumb {
@@ -148,23 +148,21 @@
       width: 16px;
       height: 16px;
       border-radius: 50%;
-      background: white;
-      border: 2px solid var(--border);
+      background: var(--text);
+      border: none;
       cursor: pointer;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      transition: all 0.2s;
+      transition: transform 0.2s;
     }
     input[type="range"]::-webkit-slider-thumb:hover {
-      border-color: var(--primary);
-      transform: scale(1.1);
+      transform: scale(1.2);
     }
 
     /* Switch */
     .switch {
       position: relative;
       display: inline-block;
-      width: 32px;
-      height: 20px;
+      width: 40px;
+      height: 24px;
     }
     .switch input { opacity: 0; width: 0; height: 0; }
     .slider {
@@ -173,29 +171,28 @@
       top: 0; left: 0; right: 0; bottom: 0;
       background-color: var(--border);
       transition: .3s;
-      border-radius: 20px;
+      border-radius: 24px;
     }
     .slider:before {
       position: absolute;
       content: "";
-      height: 16px;
-      width: 16px;
-      left: 2px;
-      bottom: 2px;
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
       background-color: white;
       transition: .3s;
       border-radius: 50%;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
     }
-    input:checked + .slider { background-color: var(--primary); }
-    input:checked + .slider:before { transform: translateX(12px); }
+    input:checked + .slider { background-color: var(--text); }
+    input:checked + .slider:before { transform: translateX(16px); }
 
     /* Color Input */
     input[type="color"] {
       -webkit-appearance: none;
       border: 1px solid var(--border);
-      width: 24px;
-      height: 24px;
+      width: 32px;
+      height: 32px;
       border-radius: 50%;
       padding: 0;
       overflow: hidden;
@@ -210,20 +207,24 @@
       background: var(--text);
       color: white;
       border: none;
-      padding: 12px;
+      padding: 16px;
       border-radius: var(--radius);
-      font-size: 12px;
-      font-weight: 600;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
       cursor: pointer;
       transition: all 0.2s;
-      margin-top: 24px;
+      margin-top: 32px;
     }
     .btn-primary:hover {
-      background: black;
-      transform: translateY(-1px);
+      background: #000;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
     .btn-primary:active {
       transform: translateY(0);
+      box-shadow: none;
     }
 
     /* Session Status */
@@ -231,42 +232,35 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 16px;
-      background: #F8F9FA;
+      padding: 16px;
+      background: var(--bg-hover);
       border-radius: var(--radius);
-      border: 1px dashed var(--border);
-      margin-top: 16px;
+      margin-top: 24px;
     }
     .status-dot {
       width: 8px; 
       height: 8px; 
       border-radius: 50%; 
       display: inline-block;
-      margin-right: 6px;
+      margin-right: 8px;
     }
     
     #borderSettings {
-      margin-top: 16px;
-      padding-top: 16px;
+      margin-top: 20px;
+      padding-top: 20px;
       border-top: 1px solid var(--border);
       display: none;
     }
-
-    /* Animations */
-    @keyframes pulse {
-      0% { transform: scale(0.95); opacity: 0.5; }
-      100% { transform: scale(1.05); opacity: 0.8; }
-    }
-    .receiving { animation: pulse 0.5s infinite alternate; }
   </style>
 </head>
 <body>
 
   <!-- Pairing Section -->
-  <div style="text-align: center; margin-bottom: 24px;">
+  <div style="text-align: center; margin-bottom: 32px;">
+    <h2 style="margin-bottom: 24px;">PINTEREST BRIDGE</h2>
     <div class="code-container" id="codeDisplay">
       <div class="code-val" id="codeText">...</div>
-      <div class="code-label">CLICK TO COPY CODE</div>
+      <div class="code-label">Click to Copy Code</div>
     </div>
     
     <div class="status-badge">
@@ -276,7 +270,7 @@
   </div>
 
   <!-- Config Section -->
-  <h3>Grid Configuration</h3>
+  <h3>Grid Settings</h3>
   <div class="card">
     <div class="control-row">
       <span class="label">Columns</span>
@@ -304,7 +298,7 @@
         <input type="range" id="borderWRange" min="1" max="20" value="2">
         <span class="value" id="borderWVal">2</span>
       </div>
-      <div class="control-row" style="margin-top: 12px;">
+      <div class="control-row" style="margin-top: 16px;">
         <span class="label">Border Color</span>
         <input type="color" id="borderColor" value="#000000">
       </div>
@@ -313,14 +307,14 @@
 
   <!-- Session Status -->
   <div class="session-info">
-    <span class="label" style="color:var(--text-muted)">Active Session</span>
+    <span class="label" style="font-weight:600; font-size:12px;">ACTIVE SESSION</span>
     <div style="display:flex; align-items:center;">
       <span id="sessionStatusDot" class="status-dot" style="background:#ddd;"></span>
       <span id="sessionStatus" style="font-size:12px; font-weight:600;">None</span>
     </div>
   </div>
 
-  <button class="btn-primary" id="newSessionBtn">Start New Grid Session</button>
+  <button class="btn-primary" id="newSessionBtn">Start New Session</button>
 
   <script>
     var SERVER_URL = 'wss://pinterest-figma-bridge.onrender.com';
@@ -364,7 +358,7 @@
       
       setTimeout(function() { 
         codeText.textContent = ROOM_ID; 
-        codeDisplay.style.borderColor = 'transparent';
+        codeDisplay.style.borderColor = 'var(--border)';
       }, 1500);
     };
 
@@ -412,9 +406,8 @@
       if (msg.type === 'session-status') {
         var isActive = msg.status === 'Active' || msg.status === 'Resumed';
         sessionStatus.textContent = isActive ? 'Active' : 'None';
-        sessionStatus.style.color = isActive ? 'var(--success)' : 'var(--text-muted)';
+        sessionStatus.style.color = isActive ? 'var(--text)' : 'var(--text-muted)';
         sessionStatusDot.style.background = isActive ? 'var(--success)' : '#ddd';
-        sessionStatusDot.style.boxShadow = isActive ? '0 0 0 2px rgba(27, 196, 125, 0.2)' : 'none';
       }
     };
 
@@ -430,21 +423,18 @@
       ws.onopen = function() {
         statusDot.className = 'dot connected';
         statusText.textContent = 'Ready to pair';
-        statusText.style.color = 'var(--text)';
         ws.send(JSON.stringify({ type: 'join', roomId: ROOM_ID }));
       };
       
       ws.onclose = function() {
         statusDot.className = 'dot';
         statusText.textContent = 'Disconnected';
-        statusText.style.color = 'var(--text-muted)';
         clearTimeout(reconnectTimer);
         reconnectTimer = setTimeout(connect, 3000);
       };
       
       ws.onerror = function() {
         statusText.textContent = 'Connection Error';
-        statusText.style.color = 'var(--error)';
       };
       
       ws.onmessage = function(event) {
@@ -457,8 +447,7 @@
           
           if (data.type === 'new-image') {
             statusText.textContent = 'Receiving Image...';
-            statusText.style.color = 'var(--primary)';
-            statusDot.classList.add('receiving');
+            statusText.style.color = 'var(--text)';
             handleImage(data);
           }
         } catch (e) {
@@ -499,19 +488,16 @@
         setTimeout(function() { 
           statusText.textContent = 'Image Added'; 
           statusText.style.color = 'var(--success)';
-          statusDot.classList.remove('receiving');
           
           setTimeout(function() {
             statusText.textContent = 'Ready to pair';
-            statusText.style.color = 'var(--text)';
+            statusText.style.color = 'var(--text-muted)';
           }, 2000);
         }, 500);
         
       } catch (e) {
         console.log('Image error:', e);
         statusText.textContent = 'Error';
-        statusText.style.color = 'var(--error)';
-        statusDot.classList.remove('receiving');
       }
     }
 
