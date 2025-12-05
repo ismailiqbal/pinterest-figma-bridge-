@@ -1,13 +1,10 @@
 // Note: We use HTTP POST, not Socket.io client in background script
 let currentRoomId = null;
-let currentServerUrl = 'http://localhost:3333';
+const BRIDGE_SERVER_URL = 'https://pinterest-figma-bridge.onrender.com';
 
 // Initialize
 function initSocket() {
-  chrome.storage.local.get(['figmaRoomId', 'bridgeServerUrl'], (result) => {
-    if (result.bridgeServerUrl) {
-      currentServerUrl = result.bridgeServerUrl;
-    }
+  chrome.storage.local.get(['figmaRoomId'], (result) => {
     if (result.figmaRoomId) {
       connectSocket(result.figmaRoomId);
     }
@@ -38,15 +35,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 async function handleSendToBridge(data) {
   // Ensure we have latest config
-  const { figmaRoomId, bridgeServerUrl } = await chrome.storage.local.get(['figmaRoomId', 'bridgeServerUrl']);
+  const { figmaRoomId } = await chrome.storage.local.get(['figmaRoomId']);
   
-  console.log('Extension: Sending to bridge', { figmaRoomId, bridgeServerUrl, url: data.url?.substring(0, 30) });
+  console.log('Extension: Sending to bridge', { figmaRoomId, url: data.url?.substring(0, 30) });
   
   if (!figmaRoomId) {
     throw new Error('Please click Extension Icon -> Connect');
   }
-
-  const server = bridgeServerUrl || 'http://localhost:3333';
 
   // POST to server
   try {
@@ -59,7 +54,7 @@ async function handleSendToBridge(data) {
     
     console.log('Extension: POSTing to', `${server}/send-image-http`, payload);
     
-    const response = await fetch(`${server}/send-image-http`, {
+    const response = await fetch(`${BRIDGE_SERVER_URL}/send-image-http`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)

@@ -36,26 +36,15 @@
     <div id="errorLog" class="error-log"></div>
   </div>
 
-  <details class="settings">
-    <summary>Server Settings</summary>
-    <input type="text" id="serverUrl" placeholder="https://your-app.herokuapp.com" value="http://localhost:3333">
-    <button id="saveBtn">Save & Reconnect</button>
-  </details>
 
   <script>
-    // 1. Get Stored URL or Default
-    let SERVER_URL = 'http://localhost:3333';
-    
-    // We can't use localStorage in Figma Plugin UI iframe easily as it might be wiped
-    // But we can try parent.postMessage to store in Figma clientStorage if needed.
-    // For now, let's just use the input value.
+    // Production server URL (hardcoded)
+    const SERVER_URL = 'https://pinterest-figma-bridge.onrender.com';
 
     const codeDisplay = document.getElementById('codeDisplay');
     const statusDot = document.getElementById('statusDot');
     const statusText = document.getElementById('statusText');
     const errorLog = document.getElementById('errorLog');
-    const serverInput = document.getElementById('serverUrl');
-    const saveBtn = document.getElementById('saveBtn');
 
     let socket = null;
     let ROOM_ID = Math.floor(100000 + Math.random() * 900000).toString();
@@ -76,21 +65,15 @@
 
     function connect() {
       if (socket) socket.disconnect();
-
-      SERVER_URL = serverInput.value.replace(/\/$/, ''); // Trim trailing slash
       
       console.log('Connecting to:', SERVER_URL);
       statusText.textContent = 'Connecting...';
       statusDot.className = 'dot';
       errorLog.textContent = '';
 
-      // Auto-detect if we should use polling (for localhost/http mixed content) 
-      // or websockets (for production https)
-      const isLocal = SERVER_URL.includes('localhost') || SERVER_URL.includes('127.0.0.1');
-      const transports = isLocal ? ['polling'] : ['websocket', 'polling'];
-
+      // Use websocket for production HTTPS
       socket = io(SERVER_URL, {
-        transports: transports,
+        transports: ['websocket', 'polling'],
         reconnectionAttempts: 10,
         timeout: 10000
       });
@@ -111,7 +94,7 @@
       socket.on('connect_error', (err) => {
         statusDot.classList.remove('connected');
         statusText.textContent = 'Connection Error';
-        errorLog.textContent = err.message + (isLocal ? ' (Try allow mixed content)' : '');
+        errorLog.textContent = err.message;
       });
 
       socket.on('disconnect', () => {
@@ -164,8 +147,6 @@
         }
       });
     }
-
-    saveBtn.addEventListener('click', connect);
 
     // Initial Connect
     connect();
