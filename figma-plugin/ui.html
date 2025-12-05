@@ -99,7 +99,13 @@
         statusDot.classList.add('connected');
         statusText.textContent = 'Connected & Ready';
         errorLog.textContent = '';
+        console.log('Socket connected, joining room:', ROOM_ID);
         socket.emit('join-room', ROOM_ID);
+      });
+
+      socket.on('joined', (data) => {
+        console.log('Successfully joined room:', data.roomId);
+        errorLog.textContent = 'Room: ' + data.roomId;
       });
 
       socket.on('connect_error', (err) => {
@@ -114,7 +120,9 @@
       });
 
       socket.on('new-image', async (data) => {
+        console.log('NEW IMAGE EVENT RECEIVED:', data);
         statusText.textContent = 'Receiving...';
+        errorLog.textContent = 'Got image: ' + data.url.substring(0, 30) + '...';
         try {
           const response = await fetch(data.url);
           const blob = await response.blob();
