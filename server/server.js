@@ -106,7 +106,7 @@ async function tryFetchImage(url) {
 
 // HTTP endpoint for Chrome Extension
 app.post('/send-image-http', async (req, res) => {
-  const { roomId, url, width, height, title } = req.body;
+  const { roomId, url, width, height, title, link } = req.body;
   
   if (!roomId || !url) {
     return res.status(400).send({ error: 'Missing roomId or url' });
@@ -126,10 +126,10 @@ app.post('/send-image-http', async (req, res) => {
     broadcastToRoom(roomId, { 
       type: 'new-image',
       url: dataUrl,
-      originalUrl: url,
-      title: title || 'Pinterest Image',
       width, 
-      height, 
+      height,
+      title,
+      link,
       timestamp: Date.now() 
     });
     

@@ -50,7 +50,8 @@ async function handleSendToBridge(data) {
       url: data.url,
       width: data.width,
       height: data.height,
-      title: data.title
+      title: data.title,
+      link: data.link
     };
     
     console.log('Extension: POSTing to', `${BRIDGE_SERVER_URL}/send-image-http`, payload);

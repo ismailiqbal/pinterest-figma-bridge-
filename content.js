@@ -83,12 +83,22 @@ function processImages() {
 
         try {
            const src = getHighestResImage(img);
+           
+           // Scrape metadata
+           const title = img.alt || document.title || 'Pinterest Image';
+           let link = window.location.href;
+           const parentLink = img.closest('a');
+           if (parentLink && parentLink.href) {
+             link = parentLink.href;
+           }
+
            const response = await chrome.runtime.sendMessage({
              action: "sendToBridge",
              url: src,
              width: img.naturalWidth,
              height: img.naturalHeight,
-             title: img.alt || 'Pinterest Image'
+             title: title,
+             link: link
            });
            
            if (response && response.success) {
