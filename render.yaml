@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: pinterest-figma-bridge
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    rootDir: server
+    envVars:
+      - key: NODE_ENV
+        value: production
+
