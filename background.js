@@ -16,7 +16,7 @@ function connectSocket(roomId) {
   // We use HTTP POST to the server, which is stateless and reliable.
   // The 'initSocket' here is mainly to load the config into memory.
   currentRoomId = roomId;
-  console.log('Extension configured:', { roomId, server: currentServerUrl });
+  console.log('Extension configured:', { roomId, server: BRIDGE_SERVER_URL });
 }
 
 // Listen for config updates
@@ -52,7 +52,7 @@ async function handleSendToBridge(data) {
       height: data.height
     };
     
-    console.log('Extension: POSTing to', `${server}/send-image-http`, payload);
+    console.log('Extension: POSTing to', `${BRIDGE_SERVER_URL}/send-image-http`, payload);
     
     const response = await fetch(`${BRIDGE_SERVER_URL}/send-image-http`, {
       method: 'POST',
