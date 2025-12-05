@@ -120,11 +120,14 @@
           const blob = await response.blob();
           const buffer = await blob.arrayBuffer();
           const bytes = new Uint8Array(buffer);
+          
+          // Convert Uint8Array to regular Array for postMessage serialization
+          const bytesArray = Array.from(bytes);
 
           parent.postMessage({ 
             pluginMessage: { 
               type: 'create-image', 
-              bytes: bytes,
+              bytes: bytesArray,
               width: data.width,
               height: data.height
             } 

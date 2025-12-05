@@ -3,40 +3,54 @@ figma.showUI(__html__, { width: 300, height: 200 });
 figma.ui.onmessage = async (msg) => {
   if (msg.type === 'create-image') {
     try {
-      const { url, width, height } = msg.data;
+      const { bytes, width, height } = msg;
       
-      // Figma requires fetching the image data
-      // We can't fetch directly in main thread usually, but we can do createNodeFromBlob if we have bytes
-      // Or we can create an image paint. 
-      // Actually, plugins usually fetch in UI thread and send bytes to main thread.
-      // But let's assume the UI thread handled the fetch.
+      console.log('Creating image from bytes:', bytes.length);
+
+      if (!bytes || bytes.length === 0) {
+        throw new Error('Image data is empty');
+      }
+
+      // Convert Array back to Uint8Array (postMessage converts it)
+      const uint8Array = new Uint8Array(bytes);
       
-      // Wait, 'msg.data' coming from UI thread can contain the bytes (Uint8Array)
-      // So UI thread: fetch(url) -> arrayBuffer -> postMessage to code.js
+      // Create Image Paint
+      const image = figma.createImage(uint8Array);
       
-      const image = figma.createImage(new Uint8Array(msg.bytes));
+      // Create Rectangle
       const node = figma.createRectangle();
       
-      // Resize
-      const ar = width / height;
-      node.resize(400, 400 / ar); // Default width 400
+      // Calculate dimensions (max 600px width for initial paste)
+      const MAX_WIDTH = 600;
+      const ar = (width && height) ? width / height : 1;
+      const finalWidth = Math.min(width || 400, MAX_WIDTH);
+      const finalHeight = finalWidth / ar;
+
+      node.resize(finalWidth, finalHeight);
       
-      node.fills = [{ type: 'IMAGE', scaleMode: 'FILL', imageHash: image.hash }];
+      // Set Fill
+      node.fills = [{
+        type: 'IMAGE',
+        scaleMode: 'FILL',
+        imageHash: image.hash
+      }];
       
-      // Center in viewport
-      node.x = figma.viewport.center.x - node.width / 2;
-      node.y = figma.viewport.center.y - node.height / 2;
+      // Position in center of viewport
+      node.x = figma.viewport.center.x - (finalWidth / 2);
+      node.y = figma.viewport.center.y - (finalHeight / 2);
       
+      // Add to page
       figma.currentPage.appendChild(node);
+      
+      // Select and Zoom to it
       figma.currentPage.selection = [node];
       figma.viewport.scrollAndZoomIntoView([node]);
       
-      figma.notify('Image pasted from Pinterest!');
+      figma.notify('Image pasted!');
       
     } catch (err) {
-      console.error(err);
-      figma.notify('Failed to create image: ' + err.message);
+      console.error('Figma Plugin Error:', err);
+      figma.notify('Error: ' + err.message);
     }
   }
 };
-
