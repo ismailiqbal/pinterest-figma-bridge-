@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const sharp = require('sharp');
 
 const app = express();
 app.use(cors());
@@ -71,12 +72,24 @@ app.post('/send-image-http', async (req, res) => {
     }
     
     // Figma only supports PNG, JPEG, and GIF
-    if (contentType === 'image/webp') {
-      throw new Error('WebP format is not supported by Figma. Please use PNG or JPEG images.');
+    // If WebP, convert to PNG
+    let finalBuffer = buffer;
+    let finalContentType = contentType;
+    
+    if (contentType === 'image/webp' || detectedFormat === 'image/webp') {
+      console.log('Converting WebP to PNG for Figma compatibility...');
+      try {
+        finalBuffer = await sharp(buffer).png().toBuffer();
+        finalContentType = 'image/png';
+        console.log('WebP converted to PNG successfully');
+      } catch (conversionError) {
+        console.error('Failed to convert WebP:', conversionError);
+        throw new Error('WebP format is not supported by Figma and conversion failed. Please use PNG or JPEG images.');
+      }
     }
     
-    const imageBase64 = buffer.toString('base64');
-    const imageDataUrl = `data:${contentType};base64,${imageBase64}`;
+    const imageBase64 = finalBuffer.toString('base64');
+    const imageDataUrl = `data:${finalContentType};base64,${imageBase64}`;
     
     // Broadcast to the specific room with data URL instead of original URL
     io.to(roomId).emit('new-image', { 
