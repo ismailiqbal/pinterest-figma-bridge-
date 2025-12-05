@@ -1,6 +1,4 @@
-import { io } from "socket.io-client";
-
-let socket = null;
+// Note: We use HTTP POST, not Socket.io client in background script
 let currentRoomId = null;
 let currentServerUrl = 'http://localhost:3333';
 
@@ -42,6 +40,8 @@ async function handleSendToBridge(data) {
   // Ensure we have latest config
   const { figmaRoomId, bridgeServerUrl } = await chrome.storage.local.get(['figmaRoomId', 'bridgeServerUrl']);
   
+  console.log('Extension: Sending to bridge', { figmaRoomId, bridgeServerUrl, url: data.url?.substring(0, 30) });
+  
   if (!figmaRoomId) {
     throw new Error('Please click Extension Icon -> Connect');
   }
@@ -50,22 +50,29 @@ async function handleSendToBridge(data) {
 
   // POST to server
   try {
+    const payload = {
+      roomId: figmaRoomId,
+      url: data.url,
+      width: data.width,
+      height: data.height
+    };
+    
+    console.log('Extension: POSTing to', `${server}/send-image-http`, payload);
+    
     const response = await fetch(`${server}/send-image-http`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        roomId: figmaRoomId,
-        url: data.url,
-        width: data.width,
-        height: data.height
-      })
+      body: JSON.stringify(payload)
     });
+    
+    const result = await response.json();
+    console.log('Extension: Server response', result);
     
     if (!response.ok) throw new Error('Bridge server error ' + response.status);
     
   } catch (err) {
     console.error('Bridge Error:', err);
-    throw new Error('Check Server URL & Connection');
+    throw new Error('Check Server URL & Connection: ' + err.message);
   }
 }
 
