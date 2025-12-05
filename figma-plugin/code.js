@@ -1,219 +1,443 @@
-figma.showUI(__html__, { width: 300, height: 200 });
+// Pinterest to Figma - Plugin Code
+// Simple, flat architecture following Figma official docs
 
-// Masonry Grid Configuration
-const GRID_COLUMNS = 3;
-const GRID_GAP = 20;
+// ============================================
+// CONFIGURATION
+// ============================================
 
-// Load grid state from storage
-let gridState = {
-  columns: Array(GRID_COLUMNS).fill(0), // Track height of each column
-  count: 0,
-  startX: 100,
-  startY: 100
+var PLUGIN_DATA_KEY = 'isPinterestGrid';
+var STORAGE_CONFIG_KEY = 'pinterestConfig';
+var STORAGE_SESSION_KEY = 'pinterestSession';
+
+var DEFAULT_CONFIG = {
+  columns: 3,
+  gap: 20,
+  columnWidth: 300,
+  showBorder: false,
+  borderWidth: 2,
+  borderColor: '#000000'
 };
 
-async function loadGridState() {
-  try {
-    const saved = await figma.clientStorage.getAsync('masonryGrid');
-    if (saved) {
-      gridState = saved;
-    }
-  } catch (e) {
-    console.log('No saved grid state, starting fresh');
-  }
-}
+// Runtime state (not persisted)
+var config = null;
+var activeFrameId = null;
 
-async function saveGridState() {
-  try {
-    await figma.clientStorage.setAsync('masonryGrid', gridState);
-  } catch (e) {
-    console.error('Failed to save grid state:', e);
-  }
-}
+// ============================================
+// INITIALIZATION
+// ============================================
 
-// Find empty area on the page by looking at TOP-LEVEL nodes only
-// We don't need to recurse deep; top-level frames/groups define the layout structure.
-function findEmptyArea() {
-  const page = figma.currentPage;
-  const topLevelNodes = page.children;
-  
-  if (topLevelNodes.length === 0) {
-    // Page is completely empty
-    return { x: 0, y: 0 };
-  }
-  
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  let hasContent = false;
-  
-  for (const node of topLevelNodes) {
-    // We use absoluteBoundingBox because it accounts for rotation/position correctly
-    // For top-level nodes, x/y is usually sufficient, but absolute is safer.
-    
-    // Skip our own grid images if we want to append to them (optional, handled by gridState)
-    // But here we want to find the "bottom" of the page content to potentially start a new grid
-    // or ensure we don't overlap if gridState is lost.
-    
-    if ('absoluteBoundingBox' in node && node.absoluteBoundingBox) {
-      const bbox = node.absoluteBoundingBox;
-      minX = Math.min(minX, bbox.x);
-      maxX = Math.max(maxX, bbox.x + bbox.width);
-      maxY = Math.max(maxY, bbox.y + bbox.height);
-      hasContent = true;
-    } else if ('width' in node && 'height' in node && 'x' in node && 'y' in node) {
-        // Fallback for nodes that might not return absoluteBoundingBox (unlikely for top-level)
-        minX = Math.min(minX, node.x);
-        maxX = Math.max(maxX, node.x + node.width);
-        maxY = Math.max(maxY, node.y + node.height);
-        hasContent = true;
-    }
-  }
-  
-  if (!hasContent) {
-      return { x: 0, y: 0 };
-  }
+// Show UI immediately
+figma.showUI(__html__, { width: 320, height: 480 });
 
-  // If we have a stored grid state that is BELOW the current content, use it.
-  // This happens if we just added an image.
-  // But if the user moved things around, we might need to re-calculate.
-  
-  // Strategy:
-  // 1. If gridState.startY is already > maxY, we are safe.
-  // 2. If not, we need to move our start point.
-  
-  const currentGridBottom = gridState.startY + Math.max(...(gridState.columns || [0]));
-  
-  if (currentGridBottom > maxY) {
-      // Our current grid keeps us safe (we are the lowest thing)
-      return { x: gridState.startX, y: gridState.startY };
-  }
-  
-  // Otherwise, start a new block below everything
-  const GAP_FROM_CONTENT = 100;
-  // Align left with content, or 0 if content is far right
-  const newX = (minX === Infinity) ? 0 : minX; 
-  const newY = maxY + GAP_FROM_CONTENT;
-  
-  return { x: newX, y: newY };
-}
+// Set up message handler immediately (before any async operations)
+figma.ui.onmessage = handleMessage;
 
-// Find the column with the minimum height (for masonry layout)
-function findShortestColumn() {
-  if (!gridState.columns || gridState.columns.length === 0) {
-      gridState.columns = Array(GRID_COLUMNS).fill(0);
-  }
+// Set up selection handler
+figma.on('selectionchange', handleSelectionChange);
 
-  let minHeight = gridState.columns[0];
-  let columnIndex = 0;
-  
-  for (let i = 1; i < gridState.columns.length; i++) {
-    if (gridState.columns[i] < minHeight) {
-      minHeight = gridState.columns[i];
-      columnIndex = i;
-    }
-  }
-  
-  return columnIndex;
-}
+// Load saved state
+loadState();
 
-figma.ui.onmessage = async (msg) => {
+// ============================================
+// MESSAGE HANDLING
+// ============================================
+
+function handleMessage(msg) {
+  console.log('Plugin received:', msg.type);
+  
   if (msg.type === 'create-image') {
-    try {
-      await loadGridState();
-      
-      const { bytes, width, height } = msg;
-      
-      console.log('Creating image from bytes:', bytes.length);
+    createImage(msg.bytes, msg.width, msg.height);
+  }
+  else if (msg.type === 'get-config') {
+    sendConfigToUI();
+  }
+  else if (msg.type === 'update-config') {
+    updateConfig(msg);
+  }
+  else if (msg.type === 'reset-session') {
+    resetSession();
+  }
+}
 
-      if (!bytes || bytes.length === 0) {
-        throw new Error('Image data is empty');
-      }
+// ============================================
+// STATE MANAGEMENT
+// ============================================
 
-      // Create Image Paint
-      const uint8Array = new Uint8Array(bytes);
-      const image = figma.createImage(uint8Array);
-      
-      // Create Rectangle
-      const node = figma.createRectangle();
-      
-      // Use ORIGINAL dimensions - don't downscale for quality
-      const MAX_DIMENSION = 2000;
-      let finalWidth = width || 400;
-      let finalHeight = height || 400;
-      
-      // Validate dimensions
-      if (!Number.isFinite(finalWidth) || finalWidth <= 0) finalWidth = 400;
-      if (!Number.isFinite(finalHeight) || finalHeight <= 0) finalHeight = 400;
-      
-      // Scale down if huge
-      if (finalWidth > MAX_DIMENSION || finalHeight > MAX_DIMENSION) {
-        const scale = Math.min(MAX_DIMENSION / finalWidth, MAX_DIMENSION / finalHeight);
-        finalWidth = finalWidth * scale;
-        finalHeight = finalHeight * scale;
+function loadState() {
+  // Load config
+  figma.clientStorage.getAsync(STORAGE_CONFIG_KEY).then(function(saved) {
+    if (saved) {
+      config = {};
+      for (var key in DEFAULT_CONFIG) {
+        config[key] = saved[key] !== undefined ? saved[key] : DEFAULT_CONFIG[key];
       }
+    } else {
+      config = {};
+      for (var key in DEFAULT_CONFIG) {
+        config[key] = DEFAULT_CONFIG[key];
+      }
+    }
+    sendConfigToUI();
+  }).catch(function(err) {
+    console.log('Error loading config:', err);
+    config = {};
+    for (var key in DEFAULT_CONFIG) {
+      config[key] = DEFAULT_CONFIG[key];
+    }
+    sendConfigToUI();
+  });
+  
+  // Load session
+  figma.clientStorage.getAsync(STORAGE_SESSION_KEY).then(function(saved) {
+    if (saved && saved.activeFrameId) {
+      // Verify the frame still exists
+      var node = figma.getNodeById(saved.activeFrameId);
+      if (node && node.type === 'FRAME' && !node.removed) {
+        var pluginData = node.getPluginData(PLUGIN_DATA_KEY);
+        if (pluginData === 'true') {
+          activeFrameId = saved.activeFrameId;
+          sendSessionStatus('Active');
+        }
+      }
+    }
+  }).catch(function(err) {
+    console.log('Error loading session:', err);
+  });
+  
+  console.log('Pinterest Bridge: Initialized');
+}
 
-      node.resize(finalWidth, finalHeight);
+function saveConfig() {
+  figma.clientStorage.setAsync(STORAGE_CONFIG_KEY, config).catch(function(err) {
+    console.log('Error saving config:', err);
+  });
+}
+
+function saveSession() {
+  var data = { activeFrameId: activeFrameId };
+  figma.clientStorage.setAsync(STORAGE_SESSION_KEY, data).catch(function(err) {
+    console.log('Error saving session:', err);
+  });
+}
+
+function sendConfigToUI() {
+  if (!config) return;
+  figma.ui.postMessage({
+    type: 'config-loaded',
+    columns: config.columns,
+    gap: config.gap,
+    columnWidth: config.columnWidth,
+    showBorder: config.showBorder,
+    borderWidth: config.borderWidth,
+    borderColor: config.borderColor
+  });
+}
+
+function sendSessionStatus(status) {
+  figma.ui.postMessage({
+    type: 'session-status',
+    status: status
+  });
+}
+
+// ============================================
+// CONFIG UPDATES
+// ============================================
+
+function updateConfig(msg) {
+  config.columns = msg.columns || 3;
+  config.gap = msg.gap || 20;
+  config.showBorder = msg.showBorder || false;
+  config.borderWidth = msg.borderWidth || 2;
+  config.borderColor = msg.borderColor || '#000000';
+  
+  saveConfig();
+  
+  // Update active frame if exists
+  if (activeFrameId) {
+    var frame = figma.getNodeById(activeFrameId);
+    if (frame && frame.type === 'FRAME' && !frame.removed) {
+      frame.itemSpacing = config.gap;
+      updateFrameBorder(frame);
       
-      // Set Fill (FIT to preserve quality)
-      node.fills = [{
-        type: 'IMAGE',
-        scaleMode: 'FIT', 
-        imageHash: image.hash
-      }];
-      
-      // CHECK FOR EMPTY SPACE & GRID POSITION
-      // We re-evaluate position every time to ensure we don't overlap if user moved things
-      // But we want to maintain the "grid" structure for a session.
-      
-      // If this is the first image of a session OR we forced a reset, recalculate start.
-      // Actually, we should check if our current grid "pointer" is safe.
-      
-      const emptyPos = findEmptyArea();
-      
-      // If findEmptyArea returned a NEW Y that is significantly different from our gridState.startY,
-      // it means there was content in the way, so we should adopt this new start position
-      // and reset columns to 0 (start a new row/grid section).
-      
-      if (Math.abs(emptyPos.y - gridState.startY) > 1 && emptyPos.y > gridState.startY) {
-          // Content is blocking our old grid area. Move down and reset columns.
-          gridState.startX = emptyPos.x;
-          gridState.startY = emptyPos.y;
-          gridState.columns = Array(GRID_COLUMNS).fill(0);
-          console.log("Moved grid start to avoid overlap:", gridState.startY);
+      // Update column gaps
+      for (var i = 0; i < frame.children.length; i++) {
+        var child = frame.children[i];
+        if (child.type === 'FRAME') {
+          child.itemSpacing = config.gap;
+        }
       }
-      
-      // Calculate specific X/Y for this image in the masonry
-      const columnIndex = findShortestColumn();
-      const ESTIMATED_COLUMN_WIDTH = 500; // We don't restrict width, so we assume a "slot" width for spacing
-      
-      // Validated positions
-      let x = gridState.startX + (columnIndex * (ESTIMATED_COLUMN_WIDTH + GRID_GAP));
-      let y = gridState.startY + gridState.columns[columnIndex];
-      
-      node.x = x;
-      node.y = y;
-      
-      // Update column height for next image
-      gridState.columns[columnIndex] += finalHeight + GRID_GAP;
-      gridState.count++;
-      
-      await saveGridState();
-      
-      // Add to page
-      figma.currentPage.appendChild(node);
-      
-      // Select and Zoom
-      figma.currentPage.selection = [node];
-      figma.viewport.scrollAndZoomIntoView([node]);
-      
-      figma.notify(`Image added!`);
-      
-    } catch (err) {
-      console.error('Figma Plugin Error:', err);
-      figma.notify('Error: ' + err.message);
     }
   }
-};
+  
+  figma.notify('Settings saved');
+}
 
-loadGridState();
+function resetSession() {
+  activeFrameId = null;
+  saveSession();
+  sendSessionStatus('None');
+  figma.notify('Ready for new grid');
+}
+
+// ============================================
+// SELECTION HANDLING
+// ============================================
+
+function handleSelectionChange() {
+  var selection = figma.currentPage.selection;
+  
+  if (selection.length === 1) {
+    var node = selection[0];
+    if (node.type === 'FRAME' && !node.removed) {
+      var pluginData = node.getPluginData(PLUGIN_DATA_KEY);
+      if (pluginData === 'true') {
+        // User selected a Pinterest Grid - resume it
+        activeFrameId = node.id;
+        saveSession();
+        sendSessionStatus('Resumed');
+        return;
+      }
+    }
+  }
+  
+  // Check if current session is still valid
+  if (activeFrameId) {
+    var frame = figma.getNodeById(activeFrameId);
+    if (frame && !frame.removed) {
+      sendSessionStatus('Active');
+    } else {
+      activeFrameId = null;
+      sendSessionStatus('None');
+    }
+  } else {
+    sendSessionStatus('None');
+  }
+}
+
+// ============================================
+// IMAGE CREATION
+// ============================================
+
+function createImage(bytes, width, height) {
+  if (!bytes || bytes.length === 0) {
+    figma.notify('Error: No image data');
+    return;
+  }
+  
+  // Ensure config is loaded
+  if (!config) {
+    config = {};
+    for (var key in DEFAULT_CONFIG) {
+      config[key] = DEFAULT_CONFIG[key];
+    }
+  }
+  
+  // Get or create grid frame
+  var gridFrame = getOrCreateGridFrame();
+  if (!gridFrame) {
+    figma.notify('Error: Could not create grid');
+    return;
+  }
+  
+  // Create image
+  var imageData;
+  try {
+    var uint8Array = new Uint8Array(bytes);
+    imageData = figma.createImage(uint8Array);
+  } catch (err) {
+    figma.notify('Error creating image: ' + err.message);
+    return;
+  }
+  
+  // Calculate aspect ratio
+  var aspectRatio = 1;
+  if (width > 0 && height > 0) {
+    aspectRatio = height / width;
+  }
+  
+  // Create rectangle with image fill
+  var rect = figma.createRectangle();
+  var rectWidth = config.columnWidth;
+  var rectHeight = Math.max(10, Math.round(rectWidth * aspectRatio));
+  
+  rect.resize(rectWidth, rectHeight);
+  rect.fills = [{
+    type: 'IMAGE',
+    scaleMode: 'FIT',
+    imageHash: imageData.hash
+  }];
+  
+  // Find shortest column and add image
+  var shortestColumn = findShortestColumn(gridFrame);
+  if (shortestColumn) {
+    shortestColumn.appendChild(rect);
+    rect.layoutAlign = 'STRETCH';
+    // Resize after appending to match column width
+    var newWidth = shortestColumn.width > 0 ? shortestColumn.width : config.columnWidth;
+    var newHeight = Math.max(10, Math.round(newWidth * aspectRatio));
+    rect.resize(newWidth, newHeight);
+  } else {
+    // Fallback: add to grid frame directly
+    gridFrame.appendChild(rect);
+  }
+  
+  // Update view
+  figma.currentPage.selection = [rect];
+  figma.viewport.scrollAndZoomIntoView([rect]);
+  figma.notify('Image added');
+}
+
+// ============================================
+// GRID FRAME MANAGEMENT
+// ============================================
+
+function getOrCreateGridFrame() {
+  // Check if we have an active valid frame
+  if (activeFrameId) {
+    var frame = figma.getNodeById(activeFrameId);
+    if (frame && frame.type === 'FRAME' && !frame.removed) {
+      return frame;
+    }
+  }
+  
+  // Check if user has a grid frame selected
+  var selection = figma.currentPage.selection;
+  if (selection.length === 1 && selection[0].type === 'FRAME') {
+    var selectedFrame = selection[0];
+    var pluginData = selectedFrame.getPluginData(PLUGIN_DATA_KEY);
+    if (pluginData === 'true' && !selectedFrame.removed) {
+      activeFrameId = selectedFrame.id;
+      saveSession();
+      sendSessionStatus('Resumed');
+      return selectedFrame;
+    }
+  }
+  
+  // Create new grid frame
+  return createNewGridFrame();
+}
+
+function createNewGridFrame() {
+  var frame = figma.createFrame();
+  frame.name = 'Pinterest Grid';
+  
+  // Set up horizontal auto-layout for columns
+  frame.layoutMode = 'HORIZONTAL';
+  frame.primaryAxisSizingMode = 'AUTO';
+  frame.counterAxisSizingMode = 'AUTO';
+  frame.itemSpacing = config.gap;
+  frame.paddingTop = 20;
+  frame.paddingBottom = 20;
+  frame.paddingLeft = 20;
+  frame.paddingRight = 20;
+  frame.fills = [];
+  
+  // Mark as Pinterest Grid
+  frame.setPluginData(PLUGIN_DATA_KEY, 'true');
+  
+  // Apply border if enabled
+  updateFrameBorder(frame);
+  
+  // Create columns
+  for (var i = 0; i < config.columns; i++) {
+    var column = figma.createFrame();
+    column.name = 'Column ' + (i + 1);
+    
+    // Set up vertical auto-layout
+    column.layoutMode = 'VERTICAL';
+    column.primaryAxisSizingMode = 'AUTO';
+    column.counterAxisSizingMode = 'FIXED';
+    column.itemSpacing = config.gap;
+    column.fills = [];
+    column.resize(config.columnWidth, 100);
+    
+    frame.appendChild(column);
+  }
+  
+  // Position frame in empty area
+  var position = findEmptyPosition();
+  frame.x = position.x;
+  frame.y = position.y;
+  
+  // Add to page
+  figma.currentPage.appendChild(frame);
+  
+  // Save reference
+  activeFrameId = frame.id;
+  saveSession();
+  sendSessionStatus('Active');
+  
+  return frame;
+}
+
+function updateFrameBorder(frame) {
+  if (config.showBorder) {
+    var color = hexToRgb(config.borderColor);
+    frame.strokes = [{
+      type: 'SOLID',
+      color: color
+    }];
+    frame.strokeWeight = config.borderWidth;
+  } else {
+    frame.strokes = [];
+  }
+}
+
+function findShortestColumn(gridFrame) {
+  var shortestColumn = null;
+  var minHeight = Infinity;
+  
+  for (var i = 0; i < gridFrame.children.length; i++) {
+    var child = gridFrame.children[i];
+    if (child.type === 'FRAME') {
+      var height = child.height || 0;
+      if (height < minHeight) {
+        minHeight = height;
+        shortestColumn = child;
+      }
+    }
+  }
+  
+  return shortestColumn;
+}
+
+function findEmptyPosition() {
+  var page = figma.currentPage;
+  var maxY = 0;
+  var minX = 100;
+  
+  for (var i = 0; i < page.children.length; i++) {
+    var node = page.children[i];
+    if (node.y !== undefined && node.height !== undefined) {
+      var bottom = node.y + node.height;
+      if (bottom > maxY) {
+        maxY = bottom;
+        if (node.x !== undefined) {
+          minX = node.x;
+        }
+      }
+    }
+  }
+  
+  return {
+    x: minX > 0 ? minX : 100,
+    y: maxY + 100
+  };
+}
+
+// ============================================
+// UTILITIES
+// ============================================
+
+function hexToRgb(hex) {
+  var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (result) {
+    return {
+      r: parseInt(result[1], 16) / 255,
+      g: parseInt(result[2], 16) / 255,
+      b: parseInt(result[3], 16) / 255
+    };
+  }
+  return { r: 0, g: 0, b: 0 };
+}
