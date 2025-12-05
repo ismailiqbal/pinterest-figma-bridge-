@@ -125,14 +125,32 @@
               bytes[i] = binaryString.charCodeAt(i);
             }
           } else {
-            // Regular URL - fetch it (shouldn't happen with our setup, but keep as fallback)
-            const response = await fetch(data.url);
+            // Regular URL - use proxy endpoint to avoid CORS
+            const BRIDGE_SERVER_URL = 'https://pinterest-figma-bridge.onrender.com';
+            const proxyUrl = `${BRIDGE_SERVER_URL}/proxy-image?url=${encodeURIComponent(data.url)}`;
+            console.log('Fetching via proxy:', proxyUrl);
+            
+            const response = await fetch(proxyUrl);
             if (!response.ok) {
-              throw new Error('Failed to fetch image: ' + response.status);
+              throw new Error('Failed to fetch image via proxy: ' + response.status);
             }
-            const blob = await response.blob();
-            const buffer = await blob.arrayBuffer();
-            bytes = new Uint8Array(buffer);
+            const result = await response.json();
+            
+            if (!result.dataUrl) {
+              throw new Error('Proxy did not return dataUrl');
+            }
+            
+            // Decode the data URL from proxy
+            const parts = result.dataUrl.split(',');
+            if (parts.length < 2) {
+              throw new Error('Invalid data URL format from proxy');
+            }
+            const base64Data = parts[1];
+            const binaryString = atob(base64Data);
+            bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
           }
           
           // Validate bytes

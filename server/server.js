@@ -28,8 +28,17 @@ app.post('/send-image-http', async (req, res) => {
   console.log(`Bridge: Sending image to Room ${roomId}: ${url.substring(0, 30)}...`);
   
   // Fetch the image and convert to base64 to avoid CORS issues
+  // Use proper headers to avoid Pinterest blocking
   try {
-    const imageResponse = await fetch(url);
+    const imageResponse = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.pinterest.com/',
+        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'identity' // Don't compress, we need raw bytes
+      }
+    });
     if (!imageResponse.ok) {
       throw new Error(`Failed to fetch image: ${imageResponse.status}`);
     }
@@ -110,6 +119,61 @@ app.post('/send-image-http', async (req, res) => {
       timestamp: Date.now() 
     });
     res.send({ success: true, warning: 'Could not proxy image' });
+  }
+});
+
+// Proxy endpoint for Figma Plugin to fetch images (bypasses CORS)
+app.get('/proxy-image', async (req, res) => {
+  const imageUrl = req.query.url;
+  if (!imageUrl) {
+    return res.status(400).send({ error: 'Missing image URL' });
+  }
+
+  try {
+    const imageResponse = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.pinterest.com/',
+        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'identity'
+      }
+    });
+
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
+    }
+
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+    
+    // Check if WebP and convert to PNG
+    const buffer = Buffer.from(imageBuffer);
+    const firstBytes = buffer.slice(0, 4);
+    let finalBuffer = buffer;
+    let finalContentType = contentType;
+    
+    // Detect WebP
+    if (firstBytes[0] === 0x52 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46 && firstBytes[3] === 0x46) {
+      if (buffer.length > 8 && buffer.slice(8, 12).toString() === 'WEBP') {
+        console.log('Converting WebP to PNG in proxy...');
+        try {
+          finalBuffer = await sharp(buffer).png().toBuffer();
+          finalContentType = 'image/png';
+        } catch (conversionError) {
+          console.error('Failed to convert WebP:', conversionError);
+          // Continue with original if conversion fails
+        }
+      }
+    }
+    
+    const base64 = finalBuffer.toString('base64');
+    const dataUrl = `data:${finalContentType};base64,${base64}`;
+    
+    res.send({ dataUrl });
+  } catch (error) {
+    console.error('Proxy image error:', error);
+    res.status(500).send({ error: 'Failed to proxy image: ' + error.message });
   }
 });
 
