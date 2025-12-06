@@ -11,7 +11,7 @@ const CONFIG = {
   bridgeServer: 'https://pinterest-figma-bridge.onrender.com',
   pinterest: {
     // Replace with your Pinterest App ID from developers.pinterest.com
-    appId: '1507772',
+    appId: '1539128',
     redirectUri: 'https://pinterest-figma-bridge.onrender.com/auth/callback',
     scope: 'pins:read'
   }
