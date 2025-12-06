@@ -371,6 +371,43 @@ app.get('/', (req, res) => {
 });
 
 /**
+ * OAuth callback handler
+ * Chrome extension redirects here after Pinterest auth
+ * This page just needs to exist - the extension reads the URL params
+ */
+app.get('/auth/callback', (req, res) => {
+  const { code, state, error } = req.query;
+  
+  if (error) {
+    res.send(`
+      <html>
+        <body style="font-family: system-ui; padding: 40px; text-align: center;">
+          <h2>Authorization Failed</h2>
+          <p>${error}</p>
+          <p>You can close this window.</p>
+        </body>
+      </html>
+    `);
+    return;
+  }
+  
+  res.send(`
+    <html>
+      <body style="font-family: system-ui; padding: 40px; text-align: center;">
+        <h2>✓ Connected to Pinterest</h2>
+        <p>You can close this window and return to the extension.</p>
+        <script>
+          // Signal completion to opener if possible
+          if (window.opener) {
+            window.opener.postMessage({ type: 'pinterest-auth-complete' }, '*');
+          }
+        </script>
+      </body>
+    </html>
+  `);
+});
+
+/**
  * OAuth token exchange endpoint
  * POST /api/auth/token
  * Body: { code: string }
