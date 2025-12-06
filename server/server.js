@@ -298,6 +298,12 @@ async function refreshAccessToken(refreshToken) {
 async function fetchPinFromApi(pinId, accessToken) {
   const { apiBase } = CONFIG.pinterest;
   
+  console.log('[API] Calling Pinterest API:', {
+    url: `${apiBase}/pins/${pinId}`,
+    pinId: pinId,
+    tokenPrefix: accessToken.substring(0, 10) + '...'
+  });
+  
   const response = await fetch(`${apiBase}/pins/${pinId}`, {
     headers: {
       'Authorization': `Bearer ${accessToken}`,
@@ -305,10 +311,22 @@ async function fetchPinFromApi(pinId, accessToken) {
     }
   });
   
+  console.log('[API] Pinterest API Response Status:', response.status, response.statusText);
+  
   const data = await response.json();
+  
+  console.log('[API] Pinterest API Response Body:', JSON.stringify(data, null, 2));
   
   if (!response.ok) {
     const errorMsg = data.message || data.error || `Pinterest API error: ${response.status}`;
+    console.error('[API] Pinterest API Error Details:', {
+      status: response.status,
+      statusText: response.statusText,
+      errorCode: data.code,
+      errorMessage: data.message,
+      error: data.error,
+      fullResponse: data
+    });
     throw new Error(errorMsg);
   }
   
