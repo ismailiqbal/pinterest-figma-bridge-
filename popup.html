@@ -66,104 +66,23 @@
       padding: 16px;
     }
 
-    /* Pinterest Auth */
-    .pinterest-status {
+    /* Manual Token Input */
+    .token-input-area {
       display: flex;
-      align-items: center;
-      gap: 12px;
+      flex-direction: column;
+      gap: 10px;
     }
     
-    .pinterest-icon {
-      width: 40px;
-      height: 40px;
-      background: var(--primary);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    
-    .pinterest-icon svg {
-      width: 20px;
-      height: 20px;
-      fill: white;
-    }
-    
-    .pinterest-info {
-      flex: 1;
-    }
-    
-    .pinterest-label {
-      font-size: 13px;
-      font-weight: 500;
-      margin-bottom: 2px;
-    }
-    
-    .pinterest-detail {
+    .helper-text {
       font-size: 11px;
       color: var(--text-muted);
+      line-height: 1.4;
     }
     
-    .pinterest-detail.connected {
-      color: var(--accent);
-    }
-
-    /* Buttons */
-    .btn {
-      width: 100%;
-      padding: 12px;
-      border: none;
-      border-radius: var(--radius);
-      font-family: 'Inter', sans-serif;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: var(--transition);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }
-    
-    .btn-pinterest {
-      background: var(--primary);
-      color: white;
-      margin-top: 12px;
-    }
-    
-    .btn-pinterest:hover {
-      background: #CC001F;
-      transform: translateY(-1px);
-    }
-    
-    .btn-primary {
-      background: var(--text);
-      color: var(--bg);
-    }
-    
-    .btn-primary:hover {
-      background: #E0E0E0;
-      transform: translateY(-1px);
-    }
-    
-    .btn-secondary {
-      background: transparent;
-      color: var(--text-muted);
-      border: 1px solid var(--border);
-      font-size: 11px;
-      padding: 8px;
-      margin-top: 8px;
-    }
-    
-    .btn-secondary:hover {
-      border-color: #444;
+    .helper-text a {
       color: var(--text);
-    }
-    
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none;
+      text-decoration: none;
+      border-bottom: 1px solid #444;
     }
 
     /* Inputs */
@@ -190,7 +109,7 @@
       border-radius: var(--radius);
       color: var(--text);
       font-family: 'Inter', sans-serif;
-      font-size: 14px;
+      font-size: 13px;
       outline: none;
       transition: var(--transition);
     }
@@ -204,6 +123,55 @@
       letter-spacing: 4px;
       text-align: center;
       font-weight: 600;
+    }
+
+    /* Buttons */
+    .btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    
+    .btn-primary {
+      background: var(--text);
+      color: var(--bg);
+    }
+    
+    .btn-primary:hover {
+      background: #E0E0E0;
+    }
+    
+    .btn-save {
+      background: #333;
+      color: #FFF;
+      margin-top: 8px;
+    }
+    
+    .btn-save:hover {
+      background: #444;
+    }
+    
+    .btn-disconnect {
+      background: transparent;
+      color: #E00;
+      border: 1px solid #E00;
+      font-size: 11px;
+      padding: 8px;
+      margin-top: 12px;
+    }
+    
+    .btn-disconnect:hover {
+      background: rgba(255,0,0,0.1);
     }
 
     /* Status */
@@ -233,7 +201,6 @@
       box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
     }
 
-    /* Hidden */
     .hidden { display: none !important; }
   </style>
 </head>
@@ -243,32 +210,38 @@
     <div class="tagline">Pinterest → Figma</div>
   </div>
 
-  <!-- Step 1: Pinterest Connection -->
+  <!-- Step 1: Pinterest Token -->
   <div class="section">
-    <div class="section-title">Step 1 · Pinterest</div>
+    <div class="section-title">Step 1 · Pinterest Access</div>
     <div class="card">
-      <div class="pinterest-status">
-        <div class="pinterest-icon">
-          <svg viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.08 3.16 9.42 7.63 11.17-.1-.94-.2-2.4.04-3.44.22-.93 1.4-5.93 1.4-5.93s-.36-.72-.36-1.78c0-1.67.97-2.91 2.17-2.91 1.02 0 1.52.77 1.52 1.69 0 1.03-.66 2.57-.99 4-.28 1.19.6 2.16 1.77 2.16 2.13 0 3.76-2.24 3.76-5.48 0-2.86-2.06-4.87-5-4.87-3.4 0-5.4 2.55-5.4 5.19 0 1.03.39 2.13.89 2.73.1.12.11.22.08.34-.09.37-.29 1.19-.33 1.35-.05.22-.18.26-.41.16-1.54-.72-2.5-2.96-2.5-4.77 0-3.88 2.82-7.44 8.14-7.44 4.27 0 7.6 3.05 7.6 7.12 0 4.25-2.68 7.67-6.4 7.67-1.25 0-2.43-.65-2.83-1.42l-.77 2.94c-.28 1.07-1.03 2.42-1.54 3.24 1.16.36 2.39.55 3.67.55 6.63 0 12-5.37 12-12S18.63 0 12 0z"/></svg>
-        </div>
-        <div class="pinterest-info">
-          <div class="pinterest-label" id="pinterestLabel">Not Connected</div>
-          <div class="pinterest-detail" id="pinterestDetail">Click below to connect</div>
-        </div>
+      
+      <!-- Not Connected State -->
+      <div id="tokenInputArea" class="token-input-area">
+        <p class="helper-text">
+          Go to Pinterest Developers -> 
+          <a href="https://developers.pinterest.com/apps/" target="_blank">Your App</a>
+          -> Generate Token
+        </p>
+        <input type="password" id="accessToken" placeholder="Paste Access Token (pina_...)" autocomplete="off">
+        <button class="btn btn-save" id="saveTokenBtn">Save Token</button>
       </div>
-      <button class="btn btn-pinterest" id="pinterestBtn">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.08 3.16 9.42 7.63 11.17-.1-.94-.2-2.4.04-3.44.22-.93 1.4-5.93 1.4-5.93s-.36-.72-.36-1.78c0-1.67.97-2.91 2.17-2.91 1.02 0 1.52.77 1.52 1.69 0 1.03-.66 2.57-.99 4-.28 1.19.6 2.16 1.77 2.16 2.13 0 3.76-2.24 3.76-5.48 0-2.86-2.06-4.87-5-4.87-3.4 0-5.4 2.55-5.4 5.19 0 1.03.39 2.13.89 2.73.1.12.11.22.08.34-.09.37-.29 1.19-.33 1.35-.05.22-.18.26-.41.16-1.54-.72-2.5-2.96-2.5-4.77 0-3.88 2.82-7.44 8.14-7.44 4.27 0 7.6 3.05 7.6 7.12 0 4.25-2.68 7.67-6.4 7.67-1.25 0-2.43-.65-2.83-1.42l-.77 2.94c-.28 1.07-1.03 2.42-1.54 3.24 1.16.36 2.39.55 3.67.55 6.63 0 12-5.37 12-12S18.63 0 12 0z"/></svg>
-        Connect Pinterest
-      </button>
-      <button class="btn btn-secondary hidden" id="disconnectBtn">
-        Disconnect Account
-      </button>
+
+      <!-- Connected State -->
+      <div id="tokenConnectedArea" class="hidden">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+          <div class="status-dot connected"></div>
+          <div style="font-size:13px; font-weight:500;">Token Saved</div>
+        </div>
+        <div style="font-size:11px; color:#666; word-break:break-all;" id="maskedToken">pina_...</div>
+        <button class="btn btn-disconnect" id="disconnectBtn">Clear Token</button>
+      </div>
+
     </div>
   </div>
 
   <!-- Step 2: Figma Connection -->
   <div class="section">
-    <div class="section-title">Step 2 · Figma</div>
+    <div class="section-title">Step 2 · Figma Pairing</div>
     <div class="card">
       <div class="input-group">
         <label>Pairing Code</label>

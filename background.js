@@ -96,6 +96,7 @@ async function handleSendPinViaApi(pinId) {
  */
 async function getValidAccessToken(pinterestAuth) {
   // Check if token is expired (with 5 min buffer)
+  // Note: Manual tokens (pina_...) have no expires_at, so they never expire here
   const isExpired = pinterestAuth.expires_at && 
                     Date.now() > (pinterestAuth.expires_at - 300000);
   
@@ -105,7 +106,8 @@ async function getValidAccessToken(pinterestAuth) {
   
   // Token expired, try to refresh
   if (!pinterestAuth.refresh_token) {
-    throw new Error('Pinterest session expired. Please reconnect.');
+    // If it's a manual token that somehow expired (revoked), we can't refresh
+    throw new Error('Pinterest session expired. Please update your token in the extension.');
   }
   
   console.log('[Figpins] Refreshing expired token...');

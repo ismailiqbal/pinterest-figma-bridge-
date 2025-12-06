@@ -1,32 +1,20 @@
 /**
  * Figpins - Extension Popup
- * Handles Pinterest OAuth and Figma pairing
+ * Handles Manual Token Entry and Figma pairing
  */
-
-// ============================================================================
-// CONFIGURATION
-// ============================================================================
-
-const CONFIG = {
-  bridgeServer: 'https://pinterest-figma-bridge.onrender.com',
-  pinterest: {
-    // Replace with your Pinterest App ID from developers.pinterest.com
-    appId: '1539128',
-    redirectUri: 'https://pinterest-figma-bridge.onrender.com/auth/callback',
-    scope: 'pins:read'
-  }
-};
 
 // ============================================================================
 // DOM ELEMENTS
 // ============================================================================
 
 const elements = {
-  // Pinterest
-  pinterestLabel: document.getElementById('pinterestLabel'),
-  pinterestDetail: document.getElementById('pinterestDetail'),
-  pinterestBtn: document.getElementById('pinterestBtn'),
+  // Pinterest Token
+  tokenInputArea: document.getElementById('tokenInputArea'),
+  tokenConnectedArea: document.getElementById('tokenConnectedArea'),
+  accessTokenInput: document.getElementById('accessToken'),
+  saveTokenBtn: document.getElementById('saveTokenBtn'),
   disconnectBtn: document.getElementById('disconnectBtn'),
+  maskedToken: document.getElementById('maskedToken'),
   
   // Figma
   codeInput: document.getElementById('code'),
@@ -38,209 +26,75 @@ const elements = {
 };
 
 // ============================================================================
-// PINTEREST OAUTH
+// PINTEREST TOKEN MANAGEMENT
 // ============================================================================
 
 /**
- * Build Pinterest OAuth URL
+ * Save manually entered token
  */
-function buildPinterestAuthUrl() {
-  const { appId, redirectUri, scope } = CONFIG.pinterest;
-  const state = generateRandomState();
+async function saveToken() {
+  const token = elements.accessTokenInput.value.trim();
   
-  // Save state for CSRF protection
-  chrome.storage.local.set({ pinterestOAuthState: state });
-  
-  const params = new URLSearchParams({
-    client_id: appId,
-    redirect_uri: redirectUri,
-    response_type: 'code',
-    scope: scope,
-    state: state
-  });
-  
-  return `https://www.pinterest.com/oauth/?${params.toString()}`;
-}
-
-/**
- * Generate random state for CSRF protection
- */
-function generateRandomState() {
-  const array = new Uint8Array(16);
-  crypto.getRandomValues(array);
-  return Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
-}
-
-/**
- * Connect Pinterest account via OAuth
- */
-async function connectPinterest() {
-  try {
-    console.log('Starting OAuth flow...');
-    elements.pinterestBtn.disabled = true;
-    elements.pinterestBtn.innerHTML = 'Connecting...';
-    
-    const authUrl = buildPinterestAuthUrl();
-    console.log('Auth URL:', authUrl);
-    
-    // Launch OAuth flow
-    const responseUrl = await chrome.identity.launchWebAuthFlow({
-      url: authUrl,
-      interactive: true
-    });
-    
-    console.log('Response URL:', responseUrl);
-    
-    if (!responseUrl) {
-      throw new Error('OAuth flow cancelled');
-    }
-    
-    // Extract authorization code from response
-    const url = new URL(responseUrl);
-    const code = url.searchParams.get('code');
-    const state = url.searchParams.get('state');
-    const error = url.searchParams.get('error');
-    
-    if (error) {
-      throw new Error(`Pinterest error: ${error}`);
-    }
-    
-    if (!code) {
-      throw new Error('No authorization code received');
-    }
-    
-    // Verify state for CSRF protection
-    const { pinterestOAuthState } = await chrome.storage.local.get('pinterestOAuthState');
-    if (state !== pinterestOAuthState) {
-      throw new Error('Invalid OAuth state - possible CSRF attack');
-    }
-    
-    // Exchange code for token via our server
-    elements.pinterestBtn.innerHTML = 'Exchanging token...';
-    
-    console.log('Exchanging code for token...');
-    const tokenResponse = await fetch(`${CONFIG.bridgeServer}/api/auth/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code })
-    });
-    
-    const tokenData = await tokenResponse.json();
-    console.log('Token response:', tokenData);
-    
-    if (!tokenData.success) {
-      throw new Error(tokenData.error || 'Token exchange failed');
-    }
-    
-    // Save token data
-    const pinterestAuth = {
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
-      token_type: tokenData.token_type,
-      expires_at: Date.now() + (tokenData.expires_in * 1000),
-      scope: tokenData.scope
-    };
-    
-    await chrome.storage.local.set({ pinterestAuth });
-    
-    // Update UI
-    updatePinterestStatus(true);
-    showStatus('Pinterest connected!', true);
-    
-  } catch (err) {
-    console.error('[Figpins] OAuth error:', err);
-    alert('Connect Error: ' + err.message); // Explicit alert for debugging
-    showStatus(err.message, false);
-    updatePinterestStatus(false);
-  } finally {
-    elements.pinterestBtn.disabled = false;
-  }
-}
-
-/**
- * Disconnect Pinterest account
- */
-async function disconnectPinterest() {
-  await chrome.storage.local.remove(['pinterestAuth', 'pinterestOAuthState']);
-  updatePinterestStatus(false);
-  showStatus('Pinterest disconnected', false);
-}
-
-/**
- * Check if Pinterest token is valid
- */
-async function checkPinterestAuth() {
-  const { pinterestAuth } = await chrome.storage.local.get('pinterestAuth');
-  
-  if (!pinterestAuth || !pinterestAuth.access_token) {
-    return false;
+  if (!token) {
+    showStatus('Please enter a token', false);
+    return;
   }
   
-  // Check if token is expired (with 5 min buffer)
-  if (pinterestAuth.expires_at && Date.now() > (pinterestAuth.expires_at - 300000)) {
-    // Try to refresh
-    if (pinterestAuth.refresh_token) {
-      try {
-        const refreshed = await refreshPinterestToken(pinterestAuth.refresh_token);
-        return refreshed;
-      } catch (err) {
-        console.error('[Figpins] Token refresh failed:', err);
-        return false;
-      }
-    }
-    return false;
+  if (!token.startsWith('pina_')) {
+    showStatus('Warning: Token usually starts with pina_', false);
+    // We allow it anyway just in case format changes
   }
   
-  return true;
-}
-
-/**
- * Refresh Pinterest access token
- */
-async function refreshPinterestToken(refreshToken) {
-  const response = await fetch(`${CONFIG.bridgeServer}/api/auth/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: refreshToken })
-  });
-  
-  const data = await response.json();
-  
-  if (!data.success) {
-    throw new Error(data.error || 'Token refresh failed');
-  }
-  
+  // Save token directly
   const pinterestAuth = {
-    access_token: data.access_token,
-    refresh_token: data.refresh_token,
-    token_type: data.token_type,
-    expires_at: Date.now() + (data.expires_in * 1000)
+    access_token: token,
+    // No refresh token for manual entry, user must re-enter if it expires
+    expires_at: null 
   };
   
   await chrome.storage.local.set({ pinterestAuth });
-  return true;
+  
+  updateTokenUI(true, token);
+  showStatus('Token saved!', true);
+  elements.accessTokenInput.value = '';
 }
 
 /**
- * Update Pinterest status UI
+ * Clear saved token
  */
-function updatePinterestStatus(connected) {
-  if (connected) {
-    elements.pinterestLabel.textContent = 'Connected';
-    elements.pinterestDetail.textContent = 'Ready to send pins';
-    elements.pinterestDetail.classList.add('connected');
-    elements.pinterestBtn.classList.add('hidden');
-    elements.disconnectBtn.classList.remove('hidden');
+async function clearToken() {
+  await chrome.storage.local.remove('pinterestAuth');
+  updateTokenUI(false);
+  showStatus('Token cleared', false);
+}
+
+/**
+ * Check if we have a saved token
+ */
+async function checkTokenStatus() {
+  const { pinterestAuth } = await chrome.storage.local.get('pinterestAuth');
+  
+  if (pinterestAuth && pinterestAuth.access_token) {
+    updateTokenUI(true, pinterestAuth.access_token);
   } else {
-    elements.pinterestLabel.textContent = 'Not Connected';
-    elements.pinterestDetail.textContent = 'Click below to connect';
-    elements.pinterestDetail.classList.remove('connected');
-    elements.pinterestBtn.classList.remove('hidden');
-    elements.pinterestBtn.innerHTML = `
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.08 3.16 9.42 7.63 11.17-.1-.94-.2-2.4.04-3.44.22-.93 1.4-5.93 1.4-5.93s-.36-.72-.36-1.78c0-1.67.97-2.91 2.17-2.91 1.02 0 1.52.77 1.52 1.69 0 1.03-.66 2.57-.99 4-.28 1.19.6 2.16 1.77 2.16 2.13 0 3.76-2.24 3.76-5.48 0-2.86-2.06-4.87-5-4.87-3.4 0-5.4 2.55-5.4 5.19 0 1.03.39 2.13.89 2.73.1.12.11.22.08.34-.09.37-.29 1.19-.33 1.35-.05.22-.18.26-.41.16-1.54-.72-2.5-2.96-2.5-4.77 0-3.88 2.82-7.44 8.14-7.44 4.27 0 7.6 3.05 7.6 7.12 0 4.25-2.68 7.67-6.4 7.67-1.25 0-2.43-.65-2.83-1.42l-.77 2.94c-.28 1.07-1.03 2.42-1.54 3.24 1.16.36 2.39.55 3.67.55 6.63 0 12-5.37 12-12S18.63 0 12 0z"/></svg>
-      Connect Pinterest
-    `;
-    elements.disconnectBtn.classList.add('hidden');
+    updateTokenUI(false);
+  }
+}
+
+/**
+ * Update UI based on token status
+ */
+function updateTokenUI(hasToken, tokenStr = '') {
+  if (hasToken) {
+    elements.tokenInputArea.classList.add('hidden');
+    elements.tokenConnectedArea.classList.remove('hidden');
+    
+    // Mask token for display
+    const visible = tokenStr.substring(0, 8);
+    elements.maskedToken.textContent = `${visible}...`;
+  } else {
+    elements.tokenInputArea.classList.remove('hidden');
+    elements.tokenConnectedArea.classList.add('hidden');
   }
 }
 
@@ -287,12 +141,8 @@ async function loadFigmaConfig() {
 // STATUS DISPLAY
 // ============================================================================
 
-/**
- * Show status message
- */
 function showStatus(message, success) {
   elements.statusText.textContent = message;
-  
   if (success) {
     elements.statusDot.classList.add('connected');
   } else {
@@ -305,22 +155,20 @@ function showStatus(message, success) {
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Check Pinterest auth status
-  const pinterestConnected = await checkPinterestAuth();
-  updatePinterestStatus(pinterestConnected);
-  
-  // Load Figma config
+  // Check status
+  await checkTokenStatus();
   await loadFigmaConfig();
   
-  // Setup event listeners
+  // Listeners
+  elements.saveTokenBtn.addEventListener('click', saveToken);
+  elements.disconnectBtn.addEventListener('click', clearToken);
   elements.connectBtn.addEventListener('click', connectFigma);
   
-  elements.pinterestBtn.addEventListener('click', connectPinterest);
-  elements.disconnectBtn.addEventListener('click', disconnectPinterest);
-  
   elements.codeInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      connectFigma();
-    }
+    if (e.key === 'Enter') connectFigma();
+  });
+  
+  elements.accessTokenInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') saveToken();
   });
 });
