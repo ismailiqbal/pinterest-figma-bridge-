@@ -127,14 +127,16 @@ async function handleSendClick(btn, imgElement) {
   btn.innerHTML = '...';
   
   try {
-    // STRICT API MODE: We ONLY try to extract Pin ID and send via API
+    // STRICT API MODE
     const pinId = extractPinId(imgElement);
     
     if (!pinId) {
       throw new Error('Could not find Pin ID. API requires a valid Pin ID.');
     }
     
-    console.log('[Figpins] Sending via API for Pin:', pinId);
+    console.log('--------------------------------------------------');
+    console.log('[Figpins] 🚀 INITIATING API REQUEST');
+    console.log('[Figpins] 📌 Target Pin ID:', pinId);
     
     const response = await chrome.runtime.sendMessage({
       action: 'sendPinViaApi',
@@ -142,17 +144,20 @@ async function handleSendClick(btn, imgElement) {
     });
     
     if (response && response.success) {
+      console.log('[Figpins] ✅ API SUCCESS: Pin sent successfully via Pinterest API');
+      console.log('--------------------------------------------------');
       btn.innerHTML = '✓ API Sent!';
       btn.style.color = '#00C853';
     } else {
+      console.error('[Figpins] ❌ API FAILURE:', response?.error);
       throw new Error(response?.error || 'API Request Failed');
     }
     
   } catch (err) {
-    console.error('[Figpins] API Error:', err);
-    btn.innerHTML = 'API Error';
+    console.error('[Figpins] Error:', err);
+    btn.innerHTML = 'Error';
     btn.style.color = '#E00';
-    alert('API Error: ' + err.message);
+    alert('Strict API Mode Error: ' + err.message);
   }
   
   setTimeout(() => {
