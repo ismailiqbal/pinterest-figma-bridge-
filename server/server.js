@@ -504,7 +504,18 @@ app.post('/api/auth/refresh', async (req, res) => {
  * Body: { roomId: string, pinId: string, accessToken: string }
  */
 app.post('/api/send-pin', async (req, res) => {
+  console.log("[API] ========== /api/send-pin ENDPOINT HIT ==========");
+  console.log("[API] Request received at:", new Date().toISOString());
+  
   const { roomId, pinId, accessToken } = req.body;
+  
+  // Log received token for verification
+  console.log("[API] Received Token Info:", {
+    hasToken: !!accessToken,
+    tokenLength: accessToken?.length || 0,
+    tokenPrefix: accessToken ? accessToken.substring(0, 20) + '...' : 'NONE',
+    tokenSuffix: accessToken ? '...' + accessToken.substring(accessToken.length - 10) : 'NONE'
+  });
   
   // Validation
   if (!roomId) {
@@ -515,6 +526,9 @@ app.post('/api/send-pin', async (req, res) => {
   }
   if (!accessToken) {
     return res.status(400).json({ success: false, error: 'Access token required' });
+  }
+  
+  console.log(`[API] Processing pin ${pinId} for room ${roomId}`);
   }
   
   console.log(`[API] Processing pin ${pinId} for room ${roomId}`);
