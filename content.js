@@ -151,7 +151,8 @@ async function handleSendClick(btn, imgElement) {
     } else {
       console.error('[Figpins] ❌ API FAILURE:', response?.error);
       if (response?.debug) {
-        console.error('[Figpins] 🐛 DEBUG INFO:', response.debug);
+        console.error('[Figpins] 🐛 DEBUG INFO (Full):', JSON.stringify(response.debug, null, 2));
+        console.error('[Figpins] 🐛 DEBUG INFO (Object):', response.debug);
       }
       throw new Error(response?.error || 'API Request Failed');
     }
