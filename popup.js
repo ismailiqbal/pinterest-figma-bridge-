@@ -54,6 +54,12 @@ async function saveToken() {
   
   await chrome.storage.local.set({ pinterestAuth });
   
+  console.log('[Figpins Popup] Token saved successfully:', {
+    length: token.length,
+    prefix: token.substring(0, 20),
+    suffix: '...' + token.substring(token.length - 10)
+  });
+  
   updateTokenUI(true, token);
   showStatus('Token saved!', true);
   elements.accessTokenInput.value = '';
@@ -89,9 +95,17 @@ function updateTokenUI(hasToken, tokenStr = '') {
     elements.tokenInputArea.classList.add('hidden');
     elements.tokenConnectedArea.classList.remove('hidden');
     
-    // Mask token for display
-    const visible = tokenStr.substring(0, 8);
-    elements.maskedToken.textContent = `${visible}...`;
+    // Show more of the token for verification (first 15 + last 10)
+    const prefix = tokenStr.substring(0, 15);
+    const suffix = tokenStr.substring(tokenStr.length - 10);
+    elements.maskedToken.textContent = `${prefix}...${suffix}`;
+    
+    // Log for debugging
+    console.log('[Figpins Popup] Token stored:', {
+      fullLength: tokenStr.length,
+      prefix: prefix,
+      suffix: suffix
+    });
   } else {
     elements.tokenInputArea.classList.remove('hidden');
     elements.tokenConnectedArea.classList.add('hidden');

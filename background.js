@@ -69,6 +69,14 @@ async function handleSendPinViaApi(pinId) {
   // Check token expiration and refresh if needed
   const accessToken = await getValidAccessToken(pinterestAuth);
   
+  // Log token info for debugging
+  console.log('[Figpins] Token Info:', {
+    tokenLength: accessToken.length,
+    tokenPrefix: accessToken.substring(0, 15) + '...',
+    tokenSuffix: '...' + accessToken.substring(accessToken.length - 10),
+    storedTokenPrefix: pinterestAuth.access_token.substring(0, 15) + '...'
+  });
+  
   console.log('[Figpins] Sending pin via API:', { pinId, roomId: figmaRoomId });
   
   // Send to bridge server
