@@ -155,7 +155,7 @@ async function handleSendClick(btn, imgElement) {
     
   } catch (err) {
     console.error('[Figpins] Error:', err);
-    btn.innerHTML = 'Error';
+    btn.innerHTML = 'API Error';
     btn.style.color = '#E00';
     alert('Strict API Mode Error: ' + err.message);
   }
@@ -179,7 +179,7 @@ function addButtons() {
 }
 
 function init() {
-  console.log('[Figpins] Initializing...');
+  console.log('[Figpins] Initializing (Strict API Mode)...');
   addButtons();
   
   const observer = new MutationObserver((mutations) => {
