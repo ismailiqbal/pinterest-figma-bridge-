@@ -150,6 +150,9 @@ async function handleSendClick(btn, imgElement) {
       btn.style.color = '#00C853';
     } else {
       console.error('[Figpins] ❌ API FAILURE:', response?.error);
+      if (response?.debug) {
+        console.error('[Figpins] 🐛 DEBUG INFO:', response.debug);
+      }
       throw new Error(response?.error || 'API Request Failed');
     }
     

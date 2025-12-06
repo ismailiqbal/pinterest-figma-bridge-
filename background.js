@@ -27,8 +27,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     case 'sendPinViaApi':
       // New: Send pin using Pinterest API
       handleSendPinViaApi(request.pinId)
-        .then(() => sendResponse({ success: true }))
-        .catch(err => sendResponse({ success: false, error: err.message }));
+        .then((result) => sendResponse({ success: true, data: result }))
+        .catch(err => sendResponse({ success: false, error: err.message, debug: err.debug }));
       return true; // Keep channel open for async response
       
     case 'sendToBridge':
@@ -84,11 +84,17 @@ async function handleSendPinViaApi(pinId) {
   
   const result = await response.json();
   
+  console.log('[Figpins] Server Response:', result);
+
   if (!response.ok || !result.success) {
-    throw new Error(result.error || `Server error: ${response.status}`);
+    // Create error with debug info
+    const error = new Error(result.error || `Server error: ${response.status}`);
+    error.debug = result; // Attach full result for debugging
+    throw error;
   }
   
   console.log('[Figpins] Pin sent successfully');
+  return result;
 }
 
 /**
