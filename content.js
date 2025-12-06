@@ -1,6 +1,7 @@
 /**
  * Figpins - Content Script
  * Injects "Send" buttons on Pinterest images
+ * Features: Pin ID extraction, API integration, Smart Fallback
  */
 
 console.log('[Figpins] Content script loaded');
@@ -71,16 +72,6 @@ function extractPinId(imgElement) {
   const pageMatch = window.location.pathname.match(/\/pin\/(\d+)/);
   if (pageMatch) {
     return pageMatch[1];
-  }
-  
-  // Strategy 5: Parse from any nearby link
-  const container = imgElement.closest('div');
-  if (container) {
-    const links = container.querySelectorAll('a[href*="/pin/"]');
-    for (const link of links) {
-      const match = link.href.match(/\/pin\/(\d+)/);
-      if (match) return match[1];
-    }
   }
   
   return null;
@@ -207,7 +198,7 @@ function createSendButton(imgElement) {
 }
 
 /**
- * Handle send button click
+ * Handle send button click with SMART FALLBACK
  */
 async function handleSendClick(btn, imgElement) {
   const originalContent = btn.innerHTML;
@@ -217,41 +208,59 @@ async function handleSendClick(btn, imgElement) {
   btn.innerHTML = '...';
   btn.style.transform = 'scale(0.95)';
   
+  let success = false;
+  
   try {
-    // Try to extract Pin ID for API method
+    // ---------------------------------------------------------
+    // ATTEMPT 1: Pinterest API (Best Quality + Metadata)
+    // ---------------------------------------------------------
     const pinId = extractPinId(imgElement);
     
-    let response;
-    
     if (pinId) {
-      // Use Pinterest API method
-      console.log('[Figpins] Using API method for pin:', pinId);
-      response = await chrome.runtime.sendMessage({
-        action: 'sendPinViaApi',
-        pinId: pinId
-      });
-    } else {
-      // Fallback to scraping method
+      console.log('[Figpins] Attempting API send for pin:', pinId);
+      try {
+        const response = await chrome.runtime.sendMessage({
+          action: 'sendPinViaApi',
+          pinId: pinId
+        });
+        
+        if (response && response.success) {
+          success = true;
+        } else {
+          console.warn('[Figpins] API failed, falling back:', response?.error);
+        }
+      } catch (apiErr) {
+        console.warn('[Figpins] API error, falling back:', apiErr.message);
+      }
+    }
+    
+    // ---------------------------------------------------------
+    // ATTEMPT 2: Scraping Fallback (Guaranteed to work)
+    // ---------------------------------------------------------
+    if (!success) {
       console.log('[Figpins] Using scraping fallback');
+      
       const src = getHighestResImage(imgElement);
-      response = await chrome.runtime.sendMessage({
+      const response = await chrome.runtime.sendMessage({
         action: 'sendToBridge',
         url: src,
         width: imgElement.naturalWidth,
         height: imgElement.naturalHeight
       });
+      
+      if (response && response.success) {
+        success = true;
+      } else {
+        throw new Error(response?.error || 'Both methods failed');
+      }
     }
     
-    if (response && response.success) {
-      // Success
-      btn.innerHTML = '✓ Sent!';
-      btn.style.color = '#00C853';
-    } else {
-      throw new Error(response?.error || 'Failed to send');
-    }
+    // Success UI
+    btn.innerHTML = '✓ Sent!';
+    btn.style.color = '#00C853';
     
   } catch (err) {
-    console.error('[Figpins] Send error:', err);
+    console.error('[Figpins] Fatal error:', err);
     
     btn.innerHTML = 'Error';
     btn.style.color = '#E00';
@@ -275,7 +284,7 @@ function showErrorAlert(errorMessage) {
   if (errorMessage.includes('pairing code') || errorMessage.includes('Figma')) {
     alert('Please connect to Figma first!\n\n1. Click the Figpins extension icon\n2. Enter the pairing code from the Figma plugin');
   } else if (errorMessage.includes('Pinterest') || errorMessage.includes('Connect')) {
-    alert('Please connect your Pinterest account!\n\n1. Click the Figpins extension icon\n2. Click "Connect Pinterest"');
+    alert('Please connect your Pinterest account!\n\n1. Click the Figpins extension icon\n2. Paste your Access Token');
   } else if (errorMessage.includes('blocked') || errorMessage.includes('fetch')) {
     alert('Could not fetch this image.\nTry a different image or check your connection.');
   } else {
