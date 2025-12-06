@@ -1,82 +1,182 @@
-// Note: We use HTTP POST, not Socket.io client in background script
-let currentRoomId = null;
-const BRIDGE_SERVER_URL = 'https://pinterest-figma-bridge.onrender.com';
+/**
+ * Figpins - Background Service Worker
+ * Handles communication between content script and bridge server
+ */
 
-// Initialize
-function initSocket() {
-  chrome.storage.local.get(['figmaRoomId'], (result) => {
-    if (result.figmaRoomId) {
-      connectSocket(result.figmaRoomId);
-    }
-  });
-}
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
 
-function connectSocket(roomId) {
-  // We don't actually maintain a socket connection in the background script for SENDING.
-  // We use HTTP POST to the server, which is stateless and reliable.
-  // The 'initSocket' here is mainly to load the config into memory.
-  currentRoomId = roomId;
-  console.log('Extension configured:', { roomId, server: BRIDGE_SERVER_URL });
-}
+const CONFIG = {
+  bridgeServer: 'https://pinterest-figma-bridge.onrender.com'
+};
 
-// Listen for config updates
+// ============================================================================
+// MESSAGE HANDLERS
+// ============================================================================
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'updateConfig') {
-    initSocket();
-  }
+  console.log('[Figpins] Message received:', request.action);
   
-  if (request.action === "sendToBridge") {
-    handleSendToBridge(request)
-      .then(() => sendResponse({ success: true }))
-      .catch(err => sendResponse({ success: false, error: err.message }));
-    return true; 
+  switch (request.action) {
+    case 'updateConfig':
+      // Config updated, nothing else needed
+      sendResponse({ success: true });
+      break;
+      
+    case 'sendPinViaApi':
+      // New: Send pin using Pinterest API
+      handleSendPinViaApi(request.pinId)
+        .then(() => sendResponse({ success: true }))
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true; // Keep channel open for async response
+      
+    case 'sendToBridge':
+      // Legacy: Send image via URL scraping
+      handleSendToBridge(request)
+        .then(() => sendResponse({ success: true }))
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true;
+      
+    default:
+      sendResponse({ success: false, error: 'Unknown action' });
   }
 });
 
-async function handleSendToBridge(data) {
-  // Ensure we have latest config
-  const { figmaRoomId } = await chrome.storage.local.get(['figmaRoomId']);
+// ============================================================================
+// API METHOD (Pinterest API)
+// ============================================================================
+
+/**
+ * Send pin to Figma via Pinterest API
+ */
+async function handleSendPinViaApi(pinId) {
+  // Get stored credentials
+  const { figmaRoomId, pinterestAuth } = await chrome.storage.local.get([
+    'figmaRoomId',
+    'pinterestAuth'
+  ]);
   
-  console.log('Extension: Sending to bridge', { figmaRoomId, url: data.url?.substring(0, 30) });
+  // Validation
+  if (!figmaRoomId) {
+    throw new Error('Open extension popup and enter Figma pairing code');
+  }
+  
+  if (!pinterestAuth || !pinterestAuth.access_token) {
+    throw new Error('Connect your Pinterest account first');
+  }
+  
+  // Check token expiration and refresh if needed
+  const accessToken = await getValidAccessToken(pinterestAuth);
+  
+  console.log('[Figpins] Sending pin via API:', { pinId, roomId: figmaRoomId });
+  
+  // Send to bridge server
+  const response = await fetch(`${CONFIG.bridgeServer}/api/send-pin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      roomId: figmaRoomId,
+      pinId: pinId,
+      accessToken: accessToken
+    })
+  });
+  
+  const result = await response.json();
+  
+  if (!response.ok || !result.success) {
+    throw new Error(result.error || `Server error: ${response.status}`);
+  }
+  
+  console.log('[Figpins] Pin sent successfully');
+}
+
+/**
+ * Get valid access token, refreshing if expired
+ */
+async function getValidAccessToken(pinterestAuth) {
+  // Check if token is expired (with 5 min buffer)
+  const isExpired = pinterestAuth.expires_at && 
+                    Date.now() > (pinterestAuth.expires_at - 300000);
+  
+  if (!isExpired) {
+    return pinterestAuth.access_token;
+  }
+  
+  // Token expired, try to refresh
+  if (!pinterestAuth.refresh_token) {
+    throw new Error('Pinterest session expired. Please reconnect.');
+  }
+  
+  console.log('[Figpins] Refreshing expired token...');
+  
+  const response = await fetch(`${CONFIG.bridgeServer}/api/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: pinterestAuth.refresh_token })
+  });
+  
+  const data = await response.json();
+  
+  if (!data.success) {
+    throw new Error('Session expired. Please reconnect Pinterest.');
+  }
+  
+  // Save new token
+  const newAuth = {
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    token_type: data.token_type,
+    expires_at: Date.now() + (data.expires_in * 1000)
+  };
+  
+  await chrome.storage.local.set({ pinterestAuth: newAuth });
+  
+  console.log('[Figpins] Token refreshed successfully');
+  return newAuth.access_token;
+}
+
+// ============================================================================
+// SCRAPING METHOD (Fallback)
+// ============================================================================
+
+/**
+ * Send image to Figma via URL scraping (fallback method)
+ */
+async function handleSendToBridge(data) {
+  const { figmaRoomId } = await chrome.storage.local.get('figmaRoomId');
   
   if (!figmaRoomId) {
-    throw new Error('Please click Extension Icon -> Connect');
+    throw new Error('Open extension popup and enter Figma pairing code');
   }
-
-  // POST to server
-  try {
-    const payload = {
+  
+  console.log('[Figpins] Sending image via scraping:', { 
+    roomId: figmaRoomId, 
+    url: data.url?.substring(0, 50) 
+  });
+  
+  const response = await fetch(`${CONFIG.bridgeServer}/send-image-http`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
       roomId: figmaRoomId,
       url: data.url,
       width: data.width,
       height: data.height
-    };
-    
-    console.log('Extension: POSTing to', `${BRIDGE_SERVER_URL}/send-image-http`, payload);
-    
-    const response = await fetch(`${BRIDGE_SERVER_URL}/send-image-http`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    
-    const result = await response.json();
-    console.log('Extension: Server response', result);
-    
-    if (!response.ok) {
-      const errorMsg = result.error || `Bridge server error ${response.status}`;
-      throw new Error(errorMsg);
-    }
-    
-    if (!result.success) {
-      throw new Error(result.error || 'Server returned failure');
-    }
-    
-  } catch (err) {
-    console.error('Bridge Error:', err);
-    throw new Error('Check Server URL & Connection: ' + err.message);
+    })
+  });
+  
+  const result = await response.json();
+  
+  if (!response.ok || !result.success) {
+    throw new Error(result.error || `Server error: ${response.status}`);
   }
+  
+  console.log('[Figpins] Image sent successfully');
 }
 
-// Start
-initSocket();
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
+console.log('[Figpins] Background service worker initialized');

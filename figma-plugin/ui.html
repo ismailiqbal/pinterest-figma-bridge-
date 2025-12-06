@@ -503,27 +503,34 @@
           arr.push(bytes[j]);
         }
 
+        // Send image with metadata to plugin
         parent.postMessage({ 
           pluginMessage: { 
             type: 'create-image', 
             bytes: arr,
             width: data.width, 
-            height: data.height 
+            height: data.height,
+            // New: Metadata from Pinterest API
+            title: data.title || '',
+            sourceUrl: data.sourceUrl || '',
+            pinId: data.pinId || ''
           } 
         }, '*');
         
-        setTimeout(function() { 
-          statusText.textContent = 'Image Added'; 
-          statusText.style.color = 'var(--accent)';
-          
-          setTimeout(function() {
-            statusText.textContent = 'Connected';
-            statusText.style.color = 'var(--text-muted)';
-          }, 2000);
-        }, 500);
+        // Show feedback
+        var hasMetadata = data.title || data.sourceUrl;
+        statusText.textContent = hasMetadata ? 'Pin Added' : 'Image Added';
+        statusText.style.color = 'var(--accent)';
+        
+        setTimeout(function() {
+          statusText.textContent = 'Connected';
+          statusText.style.color = 'var(--text-muted)';
+        }, 2500);
         
       } catch (e) {
         console.log('Image error:', e);
+        statusText.textContent = 'Error';
+        statusText.style.color = '#E00';
       }
     }
 

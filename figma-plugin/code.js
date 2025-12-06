@@ -1,9 +1,15 @@
-// Figpins - Figma Plugin
-// Receives images from Chrome Extension via WebSocket bridge
+/**
+ * Figpins - Figma Plugin
+ * Receives images from Chrome Extension via WebSocket bridge
+ * Creates masonry grid with optional pin metadata cards
+ */
 
 figma.showUI(__html__, { width: 320, height: 480 });
 
-// Grid settings
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+
 var columns = 3;
 var gap = 20;
 var columnWidth = 300;
@@ -14,11 +20,40 @@ var borderColor = '#000000';
 // Current grid frame ID
 var gridId = null;
 
-// Message handler
+// Font loading status
+var fontLoaded = false;
+
+// ============================================================================
+// FONT LOADING
+// ============================================================================
+
+/**
+ * Load required fonts for text nodes
+ */
+function loadFonts() {
+  Promise.all([
+    figma.loadFontAsync({ family: 'Inter', style: 'Medium' }),
+    figma.loadFontAsync({ family: 'Inter', style: 'Regular' })
+  ]).then(function() {
+    fontLoaded = true;
+    console.log('[Figpins] Fonts loaded');
+  }).catch(function(err) {
+    console.log('[Figpins] Font loading failed:', err);
+    fontLoaded = false;
+  });
+}
+
+// Load fonts on startup
+loadFonts();
+
+// ============================================================================
+// MESSAGE HANDLER
+// ============================================================================
+
 figma.ui.onmessage = function(msg) {
   
   if (msg.type === 'create-image') {
-    createImage(msg.bytes, msg.width, msg.height);
+    createImage(msg.bytes, msg.width, msg.height, msg.title, msg.sourceUrl);
   }
   
   if (msg.type === 'get-config') {
@@ -48,66 +83,196 @@ figma.ui.onmessage = function(msg) {
   if (msg.type === 'reset-session') {
     gridId = null;
     figma.ui.postMessage({ type: 'session-status', status: 'None' });
-    figma.notify('Ready for new grid');
+    figma.notify('Ready for new moodboard');
   }
 };
 
-// Selection change handler
+// ============================================================================
+// SELECTION HANDLER
+// ============================================================================
+
 figma.on('selectionchange', function() {
   var sel = figma.currentPage.selection;
   if (sel.length === 1 && sel[0].type === 'FRAME') {
-    var data = sel[0].getPluginData('pinterest');
+    var data = sel[0].getPluginData('figpins');
     if (data === 'grid') {
       gridId = sel[0].id;
       figma.ui.postMessage({ type: 'session-status', status: 'Resumed' });
+      figma.notify('Grid session resumed');
     }
   }
 });
 
-// Create image function
-function createImage(bytes, w, h) {
+// ============================================================================
+// IMAGE CREATION
+// ============================================================================
+
+/**
+ * Create image (or card with metadata) in the grid
+ */
+function createImage(bytes, w, h, title, sourceUrl) {
   if (!bytes || !bytes.length) {
     figma.notify('No image data');
     return;
   }
   
-  // Get or create grid
-  var grid = getGrid();
-  
-  // Create image
-  var uint8 = new Uint8Array(bytes);
-  var img = figma.createImage(uint8);
-  
-  // Calculate dimensions
-  var ratio = (h && w) ? (h / w) : 1;
-  var rectW = columnWidth;
-  var rectH = Math.round(rectW * ratio);
-  if (rectH < 10) rectH = 10;
-  
-  // Create rectangle with image
-  var rect = figma.createRectangle();
-  rect.resize(rectW, rectH);
-  rect.fills = [{
-    type: 'IMAGE',
-    scaleMode: 'FIT',
-    imageHash: img.hash
-  }];
-  
-  // Find shortest column
-  var col = getShortestColumn(grid);
-  if (col) {
-    col.appendChild(rect);
-    rect.layoutAlign = 'STRETCH';
-  } else {
-    grid.appendChild(rect);
+  try {
+    // Get or create grid
+    var grid = getGrid();
+    
+    // Create image from bytes
+    var uint8 = new Uint8Array(bytes);
+    var img = figma.createImage(uint8);
+    
+    // Calculate dimensions
+    var ratio = (h && w) ? (h / w) : 1;
+    var rectW = columnWidth;
+    var rectH = Math.round(rectW * ratio);
+    if (rectH < 10) rectH = 10;
+    
+    // Create rectangle with image fill
+    var rect = figma.createRectangle();
+    rect.name = 'Image';
+    rect.resize(rectW, rectH);
+    rect.fills = [{
+      type: 'IMAGE',
+      scaleMode: 'FIT',
+      imageHash: img.hash
+    }];
+    
+    // Find shortest column
+    var col = getShortestColumn(grid);
+    
+    // Check if we should create a card (has metadata)
+    var hasMetadata = (title && title.length > 0) || (sourceUrl && sourceUrl.length > 0);
+    
+    if (hasMetadata && fontLoaded) {
+      // Create card frame with metadata
+      var card = createPinCard(rect, rectW, rectH, title, sourceUrl);
+      
+      if (col) {
+        col.appendChild(card);
+      } else {
+        grid.appendChild(card);
+      }
+    } else {
+      // Just add the image
+      if (col) {
+        col.appendChild(rect);
+        rect.layoutAlign = 'STRETCH';
+      } else {
+        grid.appendChild(rect);
+      }
+    }
+    
+    // Select and zoom to new content
+    var nodeToSelect = hasMetadata && fontLoaded ? figma.getNodeById(rect.parent.id) : rect;
+    figma.currentPage.selection = [nodeToSelect];
+    figma.viewport.scrollAndZoomIntoView([nodeToSelect]);
+    
+    figma.notify(hasMetadata ? 'Pin card added' : 'Image added');
+    
+  } catch (err) {
+    console.log('[Figpins] Error creating image:', err);
+    figma.notify('Error: ' + err.message);
   }
-  
-  figma.currentPage.selection = [rect];
-  figma.viewport.scrollAndZoomIntoView([rect]);
-  figma.notify('Image added');
 }
 
-// Get or create grid
+/**
+ * Create a pin card with image, title, and source URL
+ */
+function createPinCard(imageRect, imgWidth, imgHeight, title, sourceUrl) {
+  // Create card container
+  var card = figma.createFrame();
+  card.name = title || 'Pin';
+  card.layoutMode = 'VERTICAL';
+  card.primaryAxisSizingMode = 'AUTO';
+  card.counterAxisSizingMode = 'FIXED';
+  card.resize(imgWidth, 100);
+  card.itemSpacing = 0;
+  card.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
+  card.cornerRadius = 12;
+  card.clipsContent = true;
+  
+  // Add image (with rounded top corners)
+  imageRect.cornerRadius = 0;
+  card.appendChild(imageRect);
+  imageRect.layoutAlign = 'STRETCH';
+  
+  // Create text container
+  var textContainer = figma.createFrame();
+  textContainer.name = 'Info';
+  textContainer.layoutMode = 'VERTICAL';
+  textContainer.primaryAxisSizingMode = 'AUTO';
+  textContainer.counterAxisSizingMode = 'STRETCH';
+  textContainer.itemSpacing = 4;
+  textContainer.paddingTop = 12;
+  textContainer.paddingBottom = 12;
+  textContainer.paddingLeft = 12;
+  textContainer.paddingRight = 12;
+  textContainer.fills = [];
+  
+  // Add title if present
+  if (title && title.length > 0) {
+    var titleText = figma.createText();
+    titleText.name = 'Title';
+    titleText.fontName = { family: 'Inter', style: 'Medium' };
+    titleText.characters = truncateText(title, 60);
+    titleText.fontSize = 14;
+    titleText.lineHeight = { value: 20, unit: 'PIXELS' };
+    titleText.fills = [{ type: 'SOLID', color: { r: 0.1, g: 0.1, b: 0.1 } }];
+    titleText.textAutoResize = 'HEIGHT';
+    textContainer.appendChild(titleText);
+    titleText.layoutAlign = 'STRETCH';
+  }
+  
+  // Add source URL if present
+  if (sourceUrl && sourceUrl.length > 0) {
+    var urlText = figma.createText();
+    urlText.name = 'Source';
+    urlText.fontName = { family: 'Inter', style: 'Regular' };
+    urlText.characters = formatUrl(sourceUrl);
+    urlText.fontSize = 11;
+    urlText.lineHeight = { value: 16, unit: 'PIXELS' };
+    urlText.fills = [{ type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 } }];
+    urlText.textAutoResize = 'HEIGHT';
+    urlText.hyperlink = { type: 'URL', value: sourceUrl };
+    textContainer.appendChild(urlText);
+    urlText.layoutAlign = 'STRETCH';
+  }
+  
+  card.appendChild(textContainer);
+  
+  return card;
+}
+
+/**
+ * Truncate text to max length
+ */
+function truncateText(text, maxLength) {
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength - 3) + '...';
+}
+
+/**
+ * Format URL for display (show domain only)
+ */
+function formatUrl(url) {
+  try {
+    var parsed = new URL(url);
+    return parsed.hostname.replace('www.', '');
+  } catch (e) {
+    return url.substring(0, 30);
+  }
+}
+
+// ============================================================================
+// GRID MANAGEMENT
+// ============================================================================
+
+/**
+ * Get existing grid or create new one
+ */
 function getGrid() {
   // Try existing grid
   if (gridId) {
@@ -129,7 +294,7 @@ function getGrid() {
   frame.paddingLeft = 20;
   frame.paddingRight = 20;
   frame.fills = [];
-  frame.setPluginData('pinterest', 'grid');
+  frame.setPluginData('figpins', 'grid');
   
   // Border
   if (showBorder) {
@@ -151,7 +316,7 @@ function getGrid() {
     frame.appendChild(col);
   }
   
-  // Position
+  // Position below existing content
   var y = 0;
   var children = figma.currentPage.children;
   for (var j = 0; j < children.length; j++) {
@@ -172,7 +337,9 @@ function getGrid() {
   return frame;
 }
 
-// Find shortest column
+/**
+ * Find the shortest column in the grid
+ */
 function getShortestColumn(grid) {
   var shortest = null;
   var minH = 999999;
@@ -188,7 +355,13 @@ function getShortestColumn(grid) {
   return shortest;
 }
 
-// Hex to RGB
+// ============================================================================
+// UTILITIES
+// ============================================================================
+
+/**
+ * Convert hex color to RGB
+ */
 function hexToRgb(hex) {
   var r = parseInt(hex.slice(1, 3), 16) / 255;
   var g = parseInt(hex.slice(3, 5), 16) / 255;
@@ -196,5 +369,8 @@ function hexToRgb(hex) {
   return { r: r, g: g, b: b };
 }
 
-console.log('Figpins Bridge: Ready');
+// ============================================================================
+// STARTUP
+// ============================================================================
 
+console.log('[Figpins] Plugin ready');

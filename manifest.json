@@ -1,21 +1,22 @@
 {
   "manifest_version": 3,
   "name": "Figpins",
-  "version": "1.2",
-  "description": "Seamlessly send high-res images from Pinterest to Figma",
+  "version": "2.0.0",
+  "description": "Seamlessly send Pinterest images to Figma with metadata",
   "action": {
     "default_popup": "popup.html"
   },
   "permissions": [
-    "contextMenus",
-    "clipboardWrite",
-    "scripting",
+    "identity",
+    "storage",
     "activeTab",
-    "storage" 
+    "scripting"
   ],
   "host_permissions": [
     "*://*.pinterest.com/*",
     "*://*.pinimg.com/*",
+    "https://api.pinterest.com/*",
+    "https://pinterest-figma-bridge.onrender.com/*",
     "http://localhost:3333/*"
   ],
   "background": {

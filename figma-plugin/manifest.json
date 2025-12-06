@@ -8,7 +8,9 @@
   "networkAccess": {
     "allowedDomains": [
       "https://pinterest-figma-bridge.onrender.com",
-      "wss://pinterest-figma-bridge.onrender.com"
+      "wss://pinterest-figma-bridge.onrender.com",
+      "https://api.pinterest.com",
+      "https://i.pinimg.com"
     ]
   }
 }
