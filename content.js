@@ -1,10 +1,10 @@
 /**
  * Figpins - Content Script
  * Injects "Send" buttons on Pinterest images
- * Features: Pin ID extraction, API integration, Smart Fallback
+ * STRICT API MODE: Uses Pinterest API only
  */
 
-console.log('[Figpins] Content script loaded');
+console.log('[Figpins] Content script loaded (Strict API Mode)');
 
 // ============================================================================
 // CONFIGURATION
@@ -44,10 +44,6 @@ const BUTTON_STYLES = {
 // PIN ID EXTRACTION
 // ============================================================================
 
-/**
- * Extract Pin ID from image element context
- * Tries multiple strategies to find the pin ID
- */
 function extractPinId(imgElement) {
   // Strategy 1: From closest anchor with /pin/ URL
   const anchor = imgElement.closest('a[href*="/pin/"]');
@@ -78,227 +74,97 @@ function extractPinId(imgElement) {
 }
 
 // ============================================================================
-// IMAGE URL EXTRACTION (Fallback)
-// ============================================================================
-
-/**
- * Get highest resolution image URL from srcset or src
- */
-function getHighestResImage(imgElement) {
-  try {
-    // Try srcset first
-    if (imgElement.srcset) {
-      const sources = imgElement.srcset.split(',').map(s => {
-        const parts = s.trim().split(' ');
-        return {
-          url: parts[0],
-          width: parseInt(parts[1]) || 0
-        };
-      });
-      
-      sources.sort((a, b) => b.width - a.width);
-      
-      if (sources.length > 0 && sources[0].url) {
-        return sources[0].url;
-      }
-    }
-    
-    // Try to upgrade URL resolution
-    const currentSrc = imgElement.src;
-    if (currentSrc.includes('pinimg.com')) {
-      // Already high-res
-      if (currentSrc.includes('/1200x/') || 
-          currentSrc.includes('/originals/') || 
-          currentSrc.includes('/736x/')) {
-        return currentSrc;
-      }
-      
-      // Upgrade to 1200x
-      if (currentSrc.match(/\/\d+x\//)) {
-        return currentSrc.replace(/\/\d+x\//, '/1200x/');
-      }
-    }
-    
-    return imgElement.src;
-  } catch (e) {
-    return imgElement.src;
-  }
-}
-
-// ============================================================================
 // BUTTON INJECTION
 // ============================================================================
 
-/**
- * Process images and add send buttons
- */
 function processImages() {
   const images = document.querySelectorAll('img');
   
   images.forEach(img => {
     try {
-      // Skip if already processed
       if (img.dataset._figpinsBtn) return;
-      
-      // Skip small images
       if (img.clientWidth < 150 || img.clientHeight < 150) return;
       
-      // Find container
       const container = img.closest('div') || img.parentElement;
       if (!container) return;
       
-      // Mark as processed
       img.dataset._figpinsBtn = 'true';
       
-      // Ensure container is positioned
       const computed = getComputedStyle(container);
       if (computed.position === 'static') {
         container.style.position = 'relative';
       }
       
-      // Create button
       const btn = createSendButton(img);
       
-      // Show/hide on hover
-      container.addEventListener('mouseenter', () => {
-        btn.style.opacity = '1';
-      });
-      
-      container.addEventListener('mouseleave', () => {
-        btn.style.opacity = '0';
-      });
+      container.addEventListener('mouseenter', () => { btn.style.opacity = '1'; });
+      container.addEventListener('mouseleave', () => { btn.style.opacity = '0'; });
       
       container.appendChild(btn);
       
     } catch (e) {
-      // Silently skip problematic images
+      // Ignore
     }
   });
 }
 
-/**
- * Create the send button element
- */
 function createSendButton(imgElement) {
   const btn = document.createElement('button');
   btn.innerHTML = BUTTON_HTML;
-  
-  // Apply styles
   Object.assign(btn.style, BUTTON_STYLES);
   
-  // Click handler
   btn.addEventListener('click', async (e) => {
     e.stopPropagation();
     e.preventDefault();
-    
     await handleSendClick(btn, imgElement);
   });
   
   return btn;
 }
 
-/**
- * Handle send button click with SMART FALLBACK
- */
 async function handleSendClick(btn, imgElement) {
   const originalContent = btn.innerHTML;
-  const originalColor = btn.style.color;
-  
-  // Show loading state
   btn.innerHTML = '...';
-  btn.style.transform = 'scale(0.95)';
-  
-  let success = false;
   
   try {
-    // ---------------------------------------------------------
-    // ATTEMPT 1: Pinterest API (Best Quality + Metadata)
-    // ---------------------------------------------------------
+    // STRICT API MODE: We ONLY try to extract Pin ID and send via API
     const pinId = extractPinId(imgElement);
     
-    if (pinId) {
-      console.log('[Figpins] Attempting API send for pin:', pinId);
-      try {
-        const response = await chrome.runtime.sendMessage({
-          action: 'sendPinViaApi',
-          pinId: pinId
-        });
-        
-        if (response && response.success) {
-          success = true;
-        } else {
-          console.warn('[Figpins] API failed, falling back:', response?.error);
-        }
-      } catch (apiErr) {
-        console.warn('[Figpins] API error, falling back:', apiErr.message);
-      }
+    if (!pinId) {
+      throw new Error('Could not find Pin ID. API requires a valid Pin ID.');
     }
     
-    // ---------------------------------------------------------
-    // ATTEMPT 2: Scraping Fallback (Guaranteed to work)
-    // ---------------------------------------------------------
-    if (!success) {
-      console.log('[Figpins] Using scraping fallback');
-      
-      const src = getHighestResImage(imgElement);
-      const response = await chrome.runtime.sendMessage({
-        action: 'sendToBridge',
-        url: src,
-        width: imgElement.naturalWidth,
-        height: imgElement.naturalHeight
-      });
-      
-      if (response && response.success) {
-        success = true;
-      } else {
-        throw new Error(response?.error || 'Both methods failed');
-      }
-    }
+    console.log('[Figpins] Sending via API for Pin:', pinId);
     
-    // Success UI
-    btn.innerHTML = '✓ Sent!';
-    btn.style.color = '#00C853';
+    const response = await chrome.runtime.sendMessage({
+      action: 'sendPinViaApi',
+      pinId: pinId
+    });
+    
+    if (response && response.success) {
+      btn.innerHTML = '✓ API Sent!';
+      btn.style.color = '#00C853';
+    } else {
+      throw new Error(response?.error || 'API Request Failed');
+    }
     
   } catch (err) {
-    console.error('[Figpins] Fatal error:', err);
-    
-    btn.innerHTML = 'Error';
+    console.error('[Figpins] API Error:', err);
+    btn.innerHTML = 'API Error';
     btn.style.color = '#E00';
-    
-    // Show helpful error message
-    showErrorAlert(err.message);
+    alert('API Error: ' + err.message);
   }
   
-  // Reset button after delay
   setTimeout(() => {
     btn.innerHTML = originalContent;
-    btn.style.color = originalColor;
-    btn.style.transform = 'scale(1)';
+    btn.style.color = '#333';
   }, 2000);
 }
 
-/**
- * Show error alert with helpful message
- */
-function showErrorAlert(errorMessage) {
-  if (errorMessage.includes('pairing code') || errorMessage.includes('Figma')) {
-    alert('Please connect to Figma first!\n\n1. Click the Figpins extension icon\n2. Enter the pairing code from the Figma plugin');
-  } else if (errorMessage.includes('Pinterest') || errorMessage.includes('Connect')) {
-    alert('Please connect your Pinterest account!\n\n1. Click the Figpins extension icon\n2. Paste your Access Token');
-  } else if (errorMessage.includes('blocked') || errorMessage.includes('fetch')) {
-    alert('Could not fetch this image.\nTry a different image or check your connection.');
-  } else {
-    alert('Error: ' + errorMessage);
-  }
-}
-
 // ============================================================================
-// BUTTON INJECTION SCHEDULER
+// INITIALIZATION
 // ============================================================================
 
-/**
- * Schedule button injection using idle callback
- */
 function addButtons() {
   if ('requestIdleCallback' in window) {
     requestIdleCallback(() => processImages(), { timeout: 1000 });
@@ -307,33 +173,18 @@ function addButtons() {
   }
 }
 
-// ============================================================================
-// INITIALIZATION
-// ============================================================================
-
 function init() {
   console.log('[Figpins] Initializing...');
-  
-  // Initial scan
   addButtons();
   
-  // Watch for new images (infinite scroll)
   const observer = new MutationObserver((mutations) => {
     const hasAddedNodes = mutations.some(m => m.addedNodes.length > 0);
-    if (hasAddedNodes) {
-      addButtons();
-    }
+    if (hasAddedNodes) addButtons();
   });
   
-  observer.observe(document.body, { 
-    childList: true, 
-    subtree: true 
-  });
-  
-  console.log('[Figpins] Ready');
+  observer.observe(document.body, { childList: true, subtree: true });
 }
 
-// Wait for page to be ready (avoid React hydration conflicts)
 if (document.readyState === 'complete') {
   setTimeout(init, 2000);
 } else {
