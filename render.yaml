@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: pinterest-figma-bridge
+    name: figpins-bridge
     env: node
     plan: free
     buildCommand: npm install
@@ -9,4 +9,10 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-
+      # Pinterest API credentials - set these in Render dashboard
+      - key: PINTEREST_APP_ID
+        sync: false
+      - key: PINTEREST_APP_SECRET
+        sync: false
+      - key: PINTEREST_REDIRECT_URI
+        sync: false

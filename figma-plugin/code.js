@@ -1,5 +1,5 @@
-// Pinterest to Figma Plugin
-// Enhanced Card Support
+// Figpins - Figma Plugin
+// Receives images from Chrome Extension via WebSocket bridge
 
 figma.showUI(__html__, { width: 320, height: 480 });
 
@@ -15,10 +15,10 @@ var borderColor = '#000000';
 var gridId = null;
 
 // Message handler
-figma.ui.onmessage = async function(msg) {
+figma.ui.onmessage = function(msg) {
   
   if (msg.type === 'create-image') {
-    await createCard(msg.bytes, msg.width, msg.height, msg.title, msg.link);
+    createImage(msg.bytes, msg.width, msg.height);
   }
   
   if (msg.type === 'get-config') {
@@ -48,7 +48,7 @@ figma.ui.onmessage = async function(msg) {
   if (msg.type === 'reset-session') {
     gridId = null;
     figma.ui.postMessage({ type: 'session-status', status: 'None' });
-    figma.notify('Ready for new moodboard');
+    figma.notify('Ready for new grid');
   }
 };
 
@@ -64,116 +64,47 @@ figma.on('selectionchange', function() {
   }
 });
 
-// Create Card with Image + Title + Link
-async function createCard(bytes, w, h, title, link) {
+// Create image function
+function createImage(bytes, w, h) {
   if (!bytes || !bytes.length) {
     figma.notify('No image data');
     return;
   }
   
-  // Load fonts first
-  await figma.loadFontAsync({ family: "Inter", style: "Regular" });
-  await figma.loadFontAsync({ family: "Inter", style: "Bold" });
-  
   // Get or create grid
   var grid = getGrid();
   
-  // Create image paint
+  // Create image
   var uint8 = new Uint8Array(bytes);
   var img = figma.createImage(uint8);
   
   // Calculate dimensions
   var ratio = (h && w) ? (h / w) : 1;
-  var cardWidth = Math.round(columnWidth);
-  var imageHeight = Math.round(cardWidth * ratio);
-  if (imageHeight < 10) imageHeight = 10;
+  var rectW = columnWidth;
+  var rectH = Math.round(rectW * ratio);
+  if (rectH < 10) rectH = 10;
   
-  // --- Create Card Container ---
-  var card = figma.createFrame();
-  card.name = "Pin Card";
-  card.layoutMode = "VERTICAL";
-  card.primaryAxisSizingMode = "AUTO"; // Hug height
-  card.counterAxisSizingMode = "FIXED"; // Fixed width
-  card.resize(cardWidth, 100);
-  card.itemSpacing = 0;
-  card.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
-  card.cornerRadius = 12;
-  // Snapping to pixel grid
-  card.x = Math.round(card.x);
-  card.y = Math.round(card.y);
-  card.effects = [{
-    type: 'DROP_SHADOW',
-    color: { r: 0, g: 0, b: 0, a: 0.1 },
-    offset: { x: 0, y: 4 },
-    radius: 12,
-    visible: true,
-    blendMode: 'NORMAL'
-  }];
-  
-  // --- Image Section ---
-  var imageFrame = figma.createFrame();
-  imageFrame.name = "Image";
-  imageFrame.layoutMode = "HORIZONTAL";
-  imageFrame.counterAxisSizingMode = "FIXED";
-  imageFrame.resize(cardWidth, imageHeight);
-  imageFrame.fills = [{
+  // Create rectangle with image
+  var rect = figma.createRectangle();
+  rect.resize(rectW, rectH);
+  rect.fills = [{
     type: 'IMAGE',
-    scaleMode: 'FILL',
+    scaleMode: 'FIT',
     imageHash: img.hash
   }];
-  card.appendChild(imageFrame);
   
-  // --- Content Section ---
-  var content = figma.createFrame();
-  content.name = "Content";
-  content.layoutMode = "VERTICAL";
-  content.layoutAlign = "STRETCH";
-  content.paddingLeft = 12;
-  content.paddingRight = 12;
-  content.paddingTop = 12;
-  content.paddingBottom = 16;
-  content.itemSpacing = 4;
-  content.fills = [];
-  
-  // Title
-  var titleText = figma.createText();
-  titleText.fontName = { family: "Inter", style: "Bold" };
-  titleText.characters = title || "Untitled Pin";
-  titleText.fontSize = 14;
-  titleText.layoutAlign = "STRETCH";
-  titleText.textAutoResize = "HEIGHT";
-  content.appendChild(titleText);
-  
-  // Link
-  if (link) {
-    var linkText = figma.createText();
-    linkText.fontName = { family: "Inter", style: "Regular" };
-    linkText.characters = "Open in Pinterest ↗";
-    linkText.fontSize = 11;
-    linkText.fills = [{ type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 } }]; // Gray
-    linkText.layoutAlign = "STRETCH";
-    linkText.textAutoResize = "HEIGHT";
-    linkText.hyperlink = { type: "URL", value: link };
-    content.appendChild(linkText);
-  }
-  
-  card.appendChild(content);
-  
-  // --- Place in Grid ---
+  // Find shortest column
   var col = getShortestColumn(grid);
   if (col) {
-    col.appendChild(card);
-    // Remove STRETCH to prevent sub-pixel resizing issues
-    // card.layoutAlign = 'STRETCH'; 
-    // Instead ensure width matches column exactly
-    card.resize(col.width, card.height);
+    col.appendChild(rect);
+    rect.layoutAlign = 'STRETCH';
   } else {
-    grid.appendChild(card);
+    grid.appendChild(rect);
   }
   
-  figma.currentPage.selection = [card];
-  figma.viewport.scrollAndZoomIntoView([card]);
-  figma.notify('Card added');
+  figma.currentPage.selection = [rect];
+  figma.viewport.scrollAndZoomIntoView([rect]);
+  figma.notify('Image added');
 }
 
 // Get or create grid
@@ -188,16 +119,16 @@ function getGrid() {
   
   // Create new grid
   var frame = figma.createFrame();
-  frame.name = 'Moodboard';
+  frame.name = 'Figpins Grid';
   frame.layoutMode = 'HORIZONTAL';
   frame.primaryAxisSizingMode = 'AUTO';
   frame.counterAxisSizingMode = 'AUTO';
   frame.itemSpacing = gap;
-  frame.paddingTop = 40;
-  frame.paddingBottom = 40;
-  frame.paddingLeft = 40;
-  frame.paddingRight = 40;
-  frame.fills = []; // Transparent background
+  frame.paddingTop = 20;
+  frame.paddingBottom = 20;
+  frame.paddingLeft = 20;
+  frame.paddingRight = 20;
+  frame.fills = [];
   frame.setPluginData('pinterest', 'grid');
   
   // Border
@@ -231,7 +162,7 @@ function getGrid() {
     }
   }
   frame.x = 100;
-  frame.y = Math.round(y + 100); // Integer positioning
+  frame.y = y + 100;
   
   figma.currentPage.appendChild(frame);
   gridId = frame.id;
@@ -265,4 +196,5 @@ function hexToRgb(hex) {
   return { r: r, g: g, b: b };
 }
 
-console.log('Pinterest Bridge: Ready');
+console.log('Figpins Bridge: Ready');
+

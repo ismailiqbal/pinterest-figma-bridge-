@@ -1,6 +1,7 @@
-// Pinterest to Figma Copier - Content Script
+// Figpins - Content Script
+// Injects "Send" buttons on Pinterest images
 
-console.log('Pinterest Figma Copier: Script loaded');
+console.log('[Figpins] Content script loaded');
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "copyImage") {
@@ -30,13 +31,13 @@ function processImages() {
   
   images.forEach(img => {
     try {
-      if (img.dataset._pinterestFigmaBtn) return;
+      if (img.dataset._figpinsBtn) return;
       if (img.clientWidth < 150 || img.clientHeight < 150) return;
 
       const container = img.closest('div') || img.parentElement;
       if (!container) return;
 
-      img.dataset._pinterestFigmaBtn = 'true';
+      img.dataset._figpinsBtn = 'true';
 
       const computed = getComputedStyle(container);
       if (computed.position === 'static') {
@@ -83,22 +84,11 @@ function processImages() {
 
         try {
            const src = getHighestResImage(img);
-           
-           // Scrape metadata
-           const title = img.alt || document.title || 'Pinterest Image';
-           let link = window.location.href;
-           const parentLink = img.closest('a');
-           if (parentLink && parentLink.href) {
-             link = parentLink.href;
-           }
-
            const response = await chrome.runtime.sendMessage({
              action: "sendToBridge",
              url: src,
              width: img.naturalWidth,
-             height: img.naturalHeight,
-             title: title,
-             link: link
+             height: img.naturalHeight
            });
            
            if (response && response.success) {
@@ -137,40 +127,38 @@ function processImages() {
 
 function getHighestResImage(imgElement) {
   try {
-    // 1. Try srcset (High Quality)
     if (imgElement.srcset) {
       const sources = imgElement.srcset.split(',').map(s => {
         const parts = s.trim().split(' ');
-        const url = parts[0];
-        let width = 0;
-        
         if (parts.length >= 2) {
-          const wPart = parts[1];
-          if (wPart.endsWith('w')) width = parseInt(wPart);
-          else if (wPart.endsWith('x')) width = parseFloat(wPart) * 1000; // rough heuristic
+           return { url: parts[0], width: parseInt(parts[1]) || 0 };
         }
-        return { url, width };
+        return { url: parts[0], width: 0 };
       });
-      
-      // Sort by width descending
       sources.sort((a, b) => b.width - a.width);
-      
-      if (sources.length > 0) return sources[0].url;
-    }
-    
-    // 2. Try upgrading the src
-    let src = imgElement.src;
-    
-    // Pinterest specific replacements
-    if (src.includes('pinimg.com')) {
-      // Replace /236x/, /474x/, /564x/ with /originals/ or /1200x/
-      // We try /originals/ first as it is the absolute highest res
-      if (src.match(/\/\d+x\//)) {
-        return src.replace(/\/\d+x\//, '/originals/');
+      // Return the highest resolution image from srcset
+      if (sources.length > 0 && sources[0].url) {
+        return sources[0].url;
       }
     }
     
-    return src;
+    // Fallback: Try to upgrade to higher resolution version from current src
+    // Prefer /1200x/ or /736x/ over /originals/ as they're more reliably accessible
+    const currentSrc = imgElement.src;
+    if (currentSrc.includes('pinimg.com')) {
+      // If it's already a high-res URL, use it
+      if (currentSrc.includes('/1200x/') || currentSrc.includes('/originals/') || currentSrc.includes('/736x/')) {
+        return currentSrc;
+      }
+      
+      // Try to upgrade to 1200x first (most reliable high-res format)
+      if (currentSrc.match(/\/\d+x\//)) {
+        const largeUrl = currentSrc.replace(/\/\d+x\//, '/1200x/');
+        return largeUrl;
+      }
+    }
+    
+    return imgElement.src;
   } catch (e) {
     return imgElement.src;
   }
@@ -178,7 +166,7 @@ function getHighestResImage(imgElement) {
 
 // STARTUP LOGIC: Wait for Hydration
 function init() {
-  console.log('Pinterest Figma Copier: Initializing...');
+  console.log('[Figpins] Initializing...');
   addButtons();
   
   const observer = new MutationObserver((mutations) => {
