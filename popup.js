@@ -76,16 +76,20 @@ function generateRandomState() {
  */
 async function connectPinterest() {
   try {
+    console.log('Starting OAuth flow...');
     elements.pinterestBtn.disabled = true;
     elements.pinterestBtn.innerHTML = 'Connecting...';
     
     const authUrl = buildPinterestAuthUrl();
+    console.log('Auth URL:', authUrl);
     
     // Launch OAuth flow
     const responseUrl = await chrome.identity.launchWebAuthFlow({
       url: authUrl,
       interactive: true
     });
+    
+    console.log('Response URL:', responseUrl);
     
     if (!responseUrl) {
       throw new Error('OAuth flow cancelled');
@@ -114,6 +118,7 @@ async function connectPinterest() {
     // Exchange code for token via our server
     elements.pinterestBtn.innerHTML = 'Exchanging token...';
     
+    console.log('Exchanging code for token...');
     const tokenResponse = await fetch(`${CONFIG.bridgeServer}/api/auth/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -121,6 +126,7 @@ async function connectPinterest() {
     });
     
     const tokenData = await tokenResponse.json();
+    console.log('Token response:', tokenData);
     
     if (!tokenData.success) {
       throw new Error(tokenData.error || 'Token exchange failed');
@@ -143,6 +149,7 @@ async function connectPinterest() {
     
   } catch (err) {
     console.error('[Figpins] OAuth error:', err);
+    alert('Connect Error: ' + err.message); // Explicit alert for debugging
     showStatus(err.message, false);
     updatePinterestStatus(false);
   } finally {
@@ -308,13 +315,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Setup event listeners
   elements.connectBtn.addEventListener('click', connectFigma);
   
+  elements.pinterestBtn.addEventListener('click', connectPinterest);
+  elements.disconnectBtn.addEventListener('click', disconnectPinterest);
+  
   elements.codeInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
       connectFigma();
     }
   });
 });
-
-// Make functions available globally for onclick handlers
-window.connectPinterest = connectPinterest;
-window.disconnectPinterest = disconnectPinterest;
